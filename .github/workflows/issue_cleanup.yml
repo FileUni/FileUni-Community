@@ -1,0 +1,127 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate bug issue template
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body || "";
+            const issueState = context.payload.issue.state || "";
+            const requiredSections = [
+              "Pre-check",
+              "Description",
+              "Steps to Reproduce",
+              "Environment"
+            ];
+
+            if (issueState !== "open") {
+              return;
+            }
+
+            function getSectionContent(sectionTitle) {
+              const escapedTitle = sectionTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+              const sectionRegex = new RegExp(
+                `###\\s+${escapedTitle}\\s*([\\s\\S]*?)(?=\\n###\\s+|\\n---\\s*|$)`,
+                "i"
+              );
+              const match = body.match(sectionRegex);
+              return match ? match[1].trim() : "";
+            }
+
+            function normalizeText(input) {
+              return input.replace(/\s+/g, " ").trim().toLowerCase();
+            }
+
+            const violations = [];
+            const missingSections = requiredSections.filter(
+              sectionTitle => !body.includes(`### ${sectionTitle}`)
+            );
+
+            if (missingSections.length > 0) {
+              violations.push(`Missing required sections: ${missingSections.join(", ")}`);
+            }
+
+            const preCheck = getSectionContent("Pre-check");
+            const totalChecks = (preCheck.match(/- \[[ xX]\]/g) || []).length;
+            const checkedCount = (preCheck.match(/- \[[xX]\]/g) || []).length;
+            if (totalChecks === 0 || checkedCount < totalChecks) {
+              violations.push("All Pre-check items must be checked.");
+            }
+
+            const description = getSectionContent("Description");
+            const normalizedDescription = normalizeText(description);
+            const descriptionLooksPlaceholder =
+              normalizedDescription.length < 20 ||
+              normalizedDescription.includes("describe the observed behavior and expected behavior clearly.") ||
+              normalizedDescription.includes("please describe the issue clearly") ||
+              normalizedDescription.includes("what happened? what did you expect to happen?");
+            if (descriptionLooksPlaceholder) {
+              violations.push("Description must include a clear problem statement and expected behavior.");
+            }
+
+            const steps = getSectionContent("Steps to Reproduce");
+            const validSteps = steps
+              .split("\n")
+              .map(line => line.trim())
+              .filter(line => /^\d+\.\s+\S+/.test(line));
+            if (validSteps.length < 2) {
+              violations.push("Steps to Reproduce must include at least two non-empty numbered steps.");
+            }
+
+            const environment = getSectionContent("Environment");
+            const environmentLines = environment
+              .split("\n")
+              .map(line => line.trim())
+              .filter(Boolean);
+            const hasNonPlaceholderEnvironment = environmentLines.some(line => {
+              const parts = line.split(":");
+              if (parts.length < 2) {
+                return false;
+              }
+              const value = parts.slice(1).join(":").trim().toLowerCase();
+              return value.length > 0 && value !== "(if frontend)";
+            });
+
+            if (!hasNonPlaceholderEnvironment) {
+              violations.push("Environment must include real runtime details (OS, browser, or related versions).");
+            }
+
+            if (violations.length > 0) {
+              const checklist = violations.map((item, index) => `${index + 1}. ${item}`).join("\n");
+              const commentBody = [
+                "Thanks for opening this Issue.",
+                "",
+                "This issue was auto-closed because the Bug Report template is incomplete.",
+                "",
+                "Missing or invalid items:",
+                checklist,
+                "",
+                "Please submit a new Bug Report with the required details."
+              ].join("\n");
+
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: commentBody
+              });
+              await github.rest.issues.addLabels({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ['needs-template', 'auto-closed']
+              });
+              await github.rest.issues.update({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'closed'
+              });
+            }

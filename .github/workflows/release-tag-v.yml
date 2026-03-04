@@ -1,0 +1,251 @@
+name: Release All (From WorkSpace)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag in FileUni-Community (e.g. v1.2.3)"
+        required: true
+      workspace_ref:
+        description: "Ref in fileuni/FileUni-WorkSpace (tag/branch/sha). Empty = tag or main"
+        required: false
+        default: ""
+      build_mode:
+        description: "Build mode (full/medium/lite/minimal). Empty uses vars.BUILD_MODE then minimal"
+        required: false
+        default: ""
+      prerelease:
+        description: "Create GitHub pre-release"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fileuni-community-release-${{ github.ref_name || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' || (!contains(github.ref_name, 'pre') && !contains(github.ref_name, 'beta') && !contains(github.ref_name, 'rc') && !contains(github.ref_name, 'alpha') && !contains(github.ref_name, 'PRE') && !contains(github.ref_name, 'BETA') && !contains(github.ref_name, 'RC') && !contains(github.ref_name, 'ALPHA'))
+    runs-on: ubuntu-latest
+    env:
+      WORKSPACE_REPO: fileuni/FileUni-WorkSpace
+      OUTPUT_DIR: /tmp/FileUniRelease
+      DEFAULT_WORKSPACE_REF: main
+    steps:
+      - name: Checkout FileUni-Community
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate required secrets
+        env:
+          FILEUNI_WORKSPACE_PAT: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "$FILEUNI_WORKSPACE_PAT" ]; then
+            echo "::error::Missing required secret FILEUNI_WORKSPACE_PAT"
+            exit 1
+          fi
+
+      - name: Resolve release and source refs
+        id: refs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            release_tag="${{ inputs.release_tag }}"
+            if [ -z "$release_tag" ]; then
+              echo "workflow_dispatch requires release_tag"
+              exit 1
+            fi
+          else
+            release_tag="${GITHUB_REF_NAME}"
+          fi
+
+          requested_workspace_ref="${{ inputs.workspace_ref }}"
+          if [ -z "$requested_workspace_ref" ]; then
+            if [ "${{ github.event_name }}" = "push" ]; then
+              requested_workspace_ref="${GITHUB_REF_NAME}"
+            else
+              requested_workspace_ref="${{ vars.WORKSPACE_DEFAULT_REF }}"
+              if [ -z "$requested_workspace_ref" ]; then
+                requested_workspace_ref="$DEFAULT_WORKSPACE_REF"
+              fi
+            fi
+          fi
+
+          requested_mode="${{ inputs.build_mode }}"
+          if [ -z "$requested_mode" ]; then
+            requested_mode="${{ vars.BUILD_MODE }}"
+          fi
+
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "requested_workspace_ref=$requested_workspace_ref" >> "$GITHUB_OUTPUT"
+          echo "requested_mode=$requested_mode" >> "$GITHUB_OUTPUT"
+          echo "Release tag: $release_tag"
+          echo "Requested workspace ref: $requested_workspace_ref"
+          echo "Requested mode: ${requested_mode:-<empty>}"
+
+      - name: Resolve workspace ref in source repository
+        id: workspace_ref
+        env:
+          FILEUNI_WORKSPACE_PAT: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ref_candidate="${{ steps.refs.outputs.requested_workspace_ref }}"
+          fallback_ref="${{ vars.WORKSPACE_DEFAULT_REF }}"
+          if [ -z "$fallback_ref" ]; then
+            fallback_ref="$DEFAULT_WORKSPACE_REF"
+          fi
+
+          auth_repo_url="https://x-access-token:${FILEUNI_WORKSPACE_PAT}@github.com/${WORKSPACE_REPO}.git"
+
+          has_tag() {
+            local ref_name="$1"
+            git ls-remote --exit-code --tags "$auth_repo_url" "refs/tags/${ref_name}" > /dev/null 2>&1
+          }
+
+          has_branch() {
+            local ref_name="$1"
+            git ls-remote --exit-code --heads "$auth_repo_url" "refs/heads/${ref_name}" > /dev/null 2>&1
+          }
+
+          resolved_ref=""
+          if [[ "$ref_candidate" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+            resolved_ref="$ref_candidate"
+          elif has_tag "$ref_candidate"; then
+            resolved_ref="$ref_candidate"
+          elif has_branch "$ref_candidate"; then
+            resolved_ref="$ref_candidate"
+          else
+            if [ "$ref_candidate" != "$fallback_ref" ] && has_branch "$fallback_ref"; then
+              echo "::warning::Source ref '${ref_candidate}' not found in ${WORKSPACE_REPO}. Falling back to '${fallback_ref}'."
+              resolved_ref="$fallback_ref"
+            else
+              echo "::error::Source ref '${ref_candidate}' not found in ${WORKSPACE_REPO}, and fallback '${fallback_ref}' is unavailable."
+              exit 1
+            fi
+          fi
+
+          echo "resolved_ref=$resolved_ref" >> "$GITHUB_OUTPUT"
+          echo "Resolved workspace ref: $resolved_ref"
+
+      - name: Checkout private workspace source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.workspace_ref.outputs.resolved_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: "0.15.2"
+
+      - name: Prepare build dependencies
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential pkg-config libssl-dev ruby ruby-dev rpm libarchive-tools \
+            squashfs-tools bubblewrap fakeroot \
+            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y upx-ucl || sudo apt-get install -y upx
+          sudo gem install --no-document fpm
+          cargo install cargo-zigbuild --locked
+          cargo install cargo-xwin --locked
+          cargo install tauri-cli --version 2.10.2 --locked
+
+      - name: Validate build matrix
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          go run script/tools.go matrix:modes
+
+      - name: Resolve build mode
+        id: build_mode
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          resolved_mode="$(go run script/tools.go matrix:resolve-mode "${{ steps.refs.outputs.requested_mode }}" minimal)"
+          echo "mode=$resolved_mode" >> "$GITHUB_OUTPUT"
+          echo "Resolved build mode: $resolved_mode"
+
+      - name: Build CLI + GUI
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+          go run script/tools.go release:build-all "${{ steps.build_mode.outputs.mode }}" --output-dir "$OUTPUT_DIR"
+          if [ ! -d "$OUTPUT_DIR" ]; then
+            echo "Expected artifact directory not found: $OUTPUT_DIR"
+            exit 1
+          fi
+          if ! compgen -G "$OUTPUT_DIR/*" > /dev/null; then
+            echo "No artifacts found in: $OUTPUT_DIR"
+            exit 1
+          fi
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-all-${{ steps.refs.outputs.release_tag }}
+          path: /tmp/FileUniRelease/*
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.refs.outputs.release_tag }}
+          WORKSPACE_REF: ${{ steps.workspace_ref.outputs.resolved_ref }}
+          BUILD_MODE: ${{ steps.build_mode.outputs.mode }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            prerelease_flag=""
+            if [ "${{ inputs.prerelease }}" = "true" ]; then
+              prerelease_flag="--prerelease"
+            fi
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "$RELEASE_TAG" \
+              --notes "Automated release from $WORKSPACE_REF (mode: $BUILD_MODE)" \
+              $prerelease_flag
+          fi
+
+          gh release upload "$RELEASE_TAG" \
+            "$OUTPUT_DIR"/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
