@@ -160,30 +160,35 @@ jobs:
         shell: bash
         working-directory: workspace
         env:
-          BUILD_REPORT_DIR: ${{ runner.temp }}/fileuni-build-report
           APPIMAGE_EXTRACT_AND_RUN: "1"
         run: |
           set -euo pipefail
           rm -rf "$OUTPUT_DIR"
           mkdir -p "$OUTPUT_DIR"
-          rm -rf "$BUILD_REPORT_DIR"
-          mkdir -p "$BUILD_REPORT_DIR"
+
+          annotate_errors() {
+            awk '
+              {
+                print
+                clean=$0
+                gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", clean)
+                if (clean ~ /\[ERROR\]|build-all failures|target failed|command failed \(|Package .* failed|failed for|error:/) {
+                  print "::error::" clean
+                }
+              }
+            '
+          }
 
           set +e
-          go run script/tools.go release:build-all "${{ steps.meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR" 2>&1 | tee "$BUILD_REPORT_DIR/release-build.log"
+          go run script/tools.go release:build-all "${{ steps.meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR" 2>&1 | annotate_errors
           build_exit=${PIPESTATUS[0]}
           if [ "$build_exit" -eq 0 ]; then
-            go run script/tools.go ci:assert-artifacts --output-dir "$OUTPUT_DIR" 2>&1 | tee "$BUILD_REPORT_DIR/assert-artifacts.log"
+            go run script/tools.go ci:assert-artifacts --output-dir "$OUTPUT_DIR" 2>&1 | annotate_errors
             assert_exit=${PIPESTATUS[0]}
           else
-            echo "skip ci:assert-artifacts because build failed" | tee "$BUILD_REPORT_DIR/assert-artifacts.log"
+            echo "skip ci:assert-artifacts because build failed"
             assert_exit=1
           fi
-          grep -nE "^\[ERROR\]|build-all failures|command failed \(|Package .* failed|failed for|error:" "$BUILD_REPORT_DIR/release-build.log" | tail -n 400 > "$BUILD_REPORT_DIR/release-errors.log" || true
-          mkdir -p "$OUTPUT_DIR/_build_report"
-          cp -f "$BUILD_REPORT_DIR/release-build.log" "$OUTPUT_DIR/_build_report/release-build.log" || true
-          cp -f "$BUILD_REPORT_DIR/assert-artifacts.log" "$OUTPUT_DIR/_build_report/assert-artifacts.log" || true
-          cp -f "$BUILD_REPORT_DIR/release-errors.log" "$OUTPUT_DIR/_build_report/release-errors.log" || true
           set -e
 
           if [ "$build_exit" -eq 0 ] && [ "$assert_exit" -eq 0 ]; then
@@ -201,19 +206,8 @@ jobs:
       - name: Generate CLI and GUI build report
         if: always()
         shell: bash
-        env:
-          BUILD_REPORT_DIR: ${{ runner.temp }}/fileuni-build-report
         run: |
           set -euo pipefail
-          RELEASE_LOG="$BUILD_REPORT_DIR/release-build.log"
-          ERROR_LOG="$BUILD_REPORT_DIR/release-errors.log"
-
-          gui_summary="$(grep -E "GUI formats (succeeded|failed):" "$RELEASE_LOG" | tail -n 2 || true)"
-          cli_summary="$(grep -E "CLI formats (succeeded|failed):" "$RELEASE_LOG" | tail -n 2 || true)"
-          gui_target_lines="$(grep -E "GUI target:|gui:|fileuni-gui|appimage|tauri build|error:" "$RELEASE_LOG" | tail -n 160 || true)"
-          cli_target_lines="$(grep -E "CLI target:|cli:|cargo zigbuild|fileuni |error:" "$RELEASE_LOG" | tail -n 160 || true)"
-          build_error_lines="$(cat "$ERROR_LOG" 2>/dev/null || true)"
-          [ -n "$build_error_lines" ] || build_error_lines="(no extracted error lines)"
 
           {
             echo "## CLI / GUI Build Result"
@@ -222,46 +216,7 @@ jobs:
             echo "- Build status: \`${{ steps.build_release.outputs.status }}\`"
             echo "- Exit code: \`${{ steps.build_release.outputs.exit_code }}\`"
             echo ""
-            echo "| Component | Status | Formats Succeeded | Formats Failed |"
-            echo "|---|---|---|---|"
-
-            gui_ok="$(echo "$gui_summary" | sed -n '1p' | sed 's/.*GUI formats succeeded: //')"
-            gui_fail="$(echo "$gui_summary" | sed -n '2p' | sed 's/.*GUI formats failed: //')"
-            cli_ok="$(echo "$cli_summary" | sed -n '1p' | sed 's/.*CLI formats succeeded: //')"
-            cli_fail="$(echo "$cli_summary" | sed -n '2p' | sed 's/.*CLI formats failed: //')"
-
-            [ -n "$gui_ok" ] || gui_ok="none"
-            [ -n "$gui_fail" ] || gui_fail="none"
-            [ -n "$cli_ok" ] || cli_ok="none"
-            [ -n "$cli_fail" ] || cli_fail="none"
-
-            gui_status="success"
-            cli_status="success"
-            [ "$gui_fail" = "none" ] || gui_status="failed"
-            [ "$cli_fail" = "none" ] || cli_status="failed"
-
-            echo "| GUI | ${gui_status} | ${gui_ok} | ${gui_fail} |"
-            echo "| CLI | ${cli_status} | ${cli_ok} | ${cli_fail} |"
-            echo ""
-            echo "### GUI Key Log Lines"
-            echo '```text'
-            echo "$gui_target_lines"
-            echo '```'
-            echo ""
-            echo "### CLI Key Log Lines"
-            echo '```text'
-            echo "$cli_target_lines"
-            echo '```'
-            if [ "${{ steps.build_release.outputs.status }}" != "success" ]; then
-              echo ""
-              echo "### Build Failure Details (Extracted)"
-              echo '```text'
-              echo "$build_error_lines"
-              echo '```'
-              echo ""
-              echo "### Build Report Files"
-              echo "- Artifact includes \`_build_report/release-build.log\` and \`_build_report/release-errors.log\`."
-            fi
+            echo "Detailed build errors are printed inline in step \`Build release artifacts\`."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload workflow artifacts
@@ -306,5 +261,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "::error::Build failed. See CLI/GUI build result table and logs in workflow summary."
+          echo "::error::Build failed in mode '${{ steps.meta.outputs.resolved_mode }}'. See inline error annotations in step 'Build release artifacts'."
           exit 1
