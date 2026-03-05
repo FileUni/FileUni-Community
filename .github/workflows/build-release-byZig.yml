@@ -180,8 +180,68 @@ jobs:
           set -euo pipefail
           rm -rf "$OUTPUT_DIR"
           mkdir -p "$OUTPUT_DIR"
-          zig build run -- release:build-all "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR"
-          zig build run -- ci:assert-artifacts --output-dir "$OUTPUT_DIR"
+          build_log="$(mktemp)"
+          assert_log="$(mktemp)"
+          trap 'rm -f "$build_log" "$assert_log"' EXIT
+
+          annotate_errors() {
+            awk '
+              {
+                print
+                clean=$0
+                gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", clean)
+                if (clean ~ /\[ERROR\]|build-all failures|target failed|command failed \(|Package .* failed|failed for|error:|fatal error:/) {
+                  print "::error::" clean
+                }
+              }
+            '
+          }
+
+          collect_failure_digest() {
+            awk '
+              {
+                clean=$0
+                gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", clean)
+                if (clean ~ /\[ERROR\]|fatal error:|error: could not compile|unsupported target|failed to find tool|unable to find dynamic system library|russh requires enabling either ring or aws-lc-rs|command failed \(|Package .* failed/) {
+                  if (!(clean in seen)) {
+                    seen[clean] = 1
+                    print clean
+                    count++
+                    if (count >= 120) {
+                      exit
+                    }
+                  }
+                }
+              }
+            ' "$@"
+          }
+
+          set +e
+          zig build run -- release:build-all "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR" 2>&1 | tee "$build_log" | annotate_errors
+          build_exit=${PIPESTATUS[0]}
+          if [ "$build_exit" -eq 0 ]; then
+            zig build run -- ci:assert-artifacts --output-dir "$OUTPUT_DIR" 2>&1 | tee "$assert_log" | annotate_errors
+            assert_exit=${PIPESTATUS[0]}
+          else
+            echo "skip ci:assert-artifacts because build failed"
+            assert_exit=1
+          fi
+          set -e
+
+          if [ "$build_exit" -ne 0 ] || [ "$assert_exit" -ne 0 ]; then
+            failure_digest="$(collect_failure_digest "$build_log" "$assert_log" | sed '/^[[:space:]]*$/d' || true)"
+            if [ -z "${failure_digest:-}" ]; then
+              failure_digest="No digest lines matched. Check full logs in this step."
+            fi
+            echo "::group::Failure digest"
+            printf '%s\n' "$failure_digest"
+            echo "::endgroup::"
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              echo "::error::$line"
+            done <<< "$failure_digest"
+            exit 1
+          fi
 
       - name: Upload Linux workflow artifacts
         uses: actions/upload-artifact@v4
@@ -281,8 +341,68 @@ jobs:
           set -euo pipefail
           rm -rf "$OUTPUT_DIR"
           mkdir -p "$OUTPUT_DIR"
-          zig build run -- release:build-all "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR"
-          zig build run -- ci:assert-artifacts --output-dir "$OUTPUT_DIR"
+          build_log="$(mktemp)"
+          assert_log="$(mktemp)"
+          trap 'rm -f "$build_log" "$assert_log"' EXIT
+
+          annotate_errors() {
+            awk '
+              {
+                print
+                clean=$0
+                gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", clean)
+                if (clean ~ /\[ERROR\]|build-all failures|target failed|command failed \(|Package .* failed|failed for|error:|fatal error:/) {
+                  print "::error::" clean
+                }
+              }
+            '
+          }
+
+          collect_failure_digest() {
+            awk '
+              {
+                clean=$0
+                gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", clean)
+                if (clean ~ /\[ERROR\]|fatal error:|error: could not compile|unsupported target|failed to find tool|unable to find dynamic system library|russh requires enabling either ring or aws-lc-rs|command failed \(|Package .* failed/) {
+                  if (!(clean in seen)) {
+                    seen[clean] = 1
+                    print clean
+                    count++
+                    if (count >= 120) {
+                      exit
+                    }
+                  }
+                }
+              }
+            ' "$@"
+          }
+
+          set +e
+          zig build run -- release:build-all "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR" 2>&1 | tee "$build_log" | annotate_errors
+          build_exit=${PIPESTATUS[0]}
+          if [ "$build_exit" -eq 0 ]; then
+            zig build run -- ci:assert-artifacts --output-dir "$OUTPUT_DIR" 2>&1 | tee "$assert_log" | annotate_errors
+            assert_exit=${PIPESTATUS[0]}
+          else
+            echo "skip ci:assert-artifacts because build failed"
+            assert_exit=1
+          fi
+          set -e
+
+          if [ "$build_exit" -ne 0 ] || [ "$assert_exit" -ne 0 ]; then
+            failure_digest="$(collect_failure_digest "$build_log" "$assert_log" | sed '/^[[:space:]]*$/d' || true)"
+            if [ -z "${failure_digest:-}" ]; then
+              failure_digest="No digest lines matched. Check full logs in this step."
+            fi
+            echo "::group::Failure digest"
+            printf '%s\n' "$failure_digest"
+            echo "::endgroup::"
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              echo "::error::$line"
+            done <<< "$failure_digest"
+            exit 1
+          fi
 
       - name: Upload macOS workflow artifacts
         uses: actions/upload-artifact@v4
