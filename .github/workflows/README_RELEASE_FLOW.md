@@ -42,3 +42,7 @@ For `tauri-cli`, `cargo-zigbuild`, and `cargo-xwin`:
 2. Fallback to `cargo install` only if prebuilt install is unavailable.
 
 This reduces environment preparation time on cache hits and avoids unnecessary source builds.
+
+## Stability Notes
+- `minimal` mode now uses `x86_64-unknown-linux-gnu` by default (CLI + GUI).
+- Host-native targets are built with native cargo/tauri commands (no zig runner), which avoids common OpenSSL cross-linking failures seen in GNU/musl mixed pipelines.
