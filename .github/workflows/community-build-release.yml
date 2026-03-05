@@ -61,6 +61,7 @@ jobs:
           release_tag="${{ inputs.release_tag }}"
           workspace_ref="${{ inputs.workspace_ref }}"
           resolved_mode="${{ inputs.build_mode }}"
+          manual_prerelease="${{ inputs.prerelease }}"
           trigger_source="${{ inputs.trigger_source }}"
           resolved_prerelease="false"
 
@@ -79,6 +80,10 @@ jobs:
 
           if [ -z "$resolved_mode" ]; then
             resolved_mode="minimal"
+          fi
+
+          if [ "$manual_prerelease" = "true" ]; then
+            resolved_prerelease="true"
           fi
 
           normalized_tag="$(printf '%s' "$release_tag" | tr '[:upper:]' '[:lower:]')"
@@ -265,23 +270,33 @@ jobs:
           RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
           WORKSPACE_REF: ${{ steps.source_ref.outputs.resolved_ref }}
           BUILD_MODE: ${{ steps.meta.outputs.resolved_mode }}
+          RESOLVED_PRERELEASE: ${{ steps.meta.outputs.resolved_prerelease }}
           TRIGGER_SOURCE: ${{ steps.meta.outputs.trigger_source }}
         shell: bash
         run: |
           set -euo pipefail
 
-          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            prerelease_flag=""
-            if [ "${{ steps.meta.outputs.resolved_prerelease }}" = "true" ]; then
-              prerelease_flag="--prerelease"
-            fi
+          prerelease_flag=""
+          if [ "$RESOLVED_PRERELEASE" = "true" ]; then
+            prerelease_flag="--prerelease"
+          fi
 
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             notes="Automated release build from ${WORKSPACE_REF} (mode: ${BUILD_MODE}, source: ${TRIGGER_SOURCE})"
             gh release create "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --title "$RELEASE_TAG" \
               --notes "$notes" \
               $prerelease_flag
+          fi
+
+          release_id="$(gh api "/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')"
+          current_prerelease="$(gh api "/repos/${GITHUB_REPOSITORY}/releases/${release_id}" --jq '.prerelease')"
+          if [ "$current_prerelease" != "$RESOLVED_PRERELEASE" ]; then
+            gh api --method PATCH \
+              "/repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
+              -F prerelease="$RESOLVED_PRERELEASE" > /dev/null
+            echo "Updated prerelease status for ${RELEASE_TAG}: ${current_prerelease} -> ${RESOLVED_PRERELEASE}"
           fi
 
           gh release upload "$RELEASE_TAG" \
