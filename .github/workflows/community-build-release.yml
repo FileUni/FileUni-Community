@@ -165,6 +165,9 @@ jobs:
           set -euo pipefail
           rm -rf "$OUTPUT_DIR"
           mkdir -p "$OUTPUT_DIR"
+          build_log="$(mktemp)"
+          assert_log="$(mktemp)"
+          trap 'rm -f "$build_log" "$assert_log"' EXIT
 
           annotate_errors() {
             awk '
@@ -179,11 +182,30 @@ jobs:
             '
           }
 
+          collect_failure_digest() {
+            awk '
+              {
+                clean=$0
+                gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", clean)
+                if (clean ~ /\[ERROR\]|fatal error:|error: could not compile|unsupported target|failed to find tool|unable to find dynamic system library|russh requires enabling either ring or aws-lc-rs|command failed \(|Package .* failed/) {
+                  if (!(clean in seen)) {
+                    seen[clean] = 1
+                    print clean
+                    count++
+                    if (count >= 120) {
+                      exit
+                    }
+                  }
+                }
+              }
+            ' "$@"
+          }
+
           set +e
-          go run script/tools.go release:build-all "${{ steps.meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR" 2>&1 | annotate_errors
+          go run script/tools.go release:build-all "${{ steps.meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR" 2>&1 | tee "$build_log" | annotate_errors
           build_exit=${PIPESTATUS[0]}
           if [ "$build_exit" -eq 0 ]; then
-            go run script/tools.go ci:assert-artifacts --output-dir "$OUTPUT_DIR" 2>&1 | annotate_errors
+            go run script/tools.go ci:assert-artifacts --output-dir "$OUTPUT_DIR" 2>&1 | tee "$assert_log" | annotate_errors
             assert_exit=${PIPESTATUS[0]}
           else
             echo "skip ci:assert-artifacts because build failed"
@@ -191,9 +213,29 @@ jobs:
           fi
           set -e
 
+          failure_digest=""
+          if [ "$build_exit" -ne 0 ] || [ "$assert_exit" -ne 0 ]; then
+            failure_digest="$(collect_failure_digest "$build_log" "$assert_log" | sed '/^[[:space:]]*$/d' || true)"
+            if [ -z "$failure_digest" ]; then
+              failure_digest="No digest lines matched. Check full logs in this step."
+            fi
+            echo "::group::Failure digest"
+            printf '%s\n' "$failure_digest"
+            echo "::endgroup::"
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              echo "::error::$line"
+            done <<< "$failure_digest"
+          fi
+
           if [ "$build_exit" -eq 0 ] && [ "$assert_exit" -eq 0 ]; then
             echo "status=success" >> "$GITHUB_OUTPUT"
             echo "exit_code=0" >> "$GITHUB_OUTPUT"
+            {
+              echo "failure_digest<<EOF"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           else
             echo "status=failed" >> "$GITHUB_OUTPUT"
             if [ "$build_exit" -ne 0 ]; then
@@ -201,6 +243,11 @@ jobs:
             else
               echo "exit_code=$assert_exit" >> "$GITHUB_OUTPUT"
             fi
+            {
+              echo "failure_digest<<EOF"
+              printf '%s\n' "$failure_digest"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Generate CLI and GUI build report
@@ -261,5 +308,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          digest="${{ steps.build_release.outputs.failure_digest }}"
+          if [ -n "$digest" ]; then
+            echo "::group::Failure digest from build step"
+            printf '%s\n' "$digest"
+            echo "::endgroup::"
+          fi
           echo "::error::Build failed in mode '${{ steps.meta.outputs.resolved_mode }}'. See inline error annotations in step 'Build release artifacts'."
           exit 1
