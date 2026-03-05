@@ -148,7 +148,6 @@ jobs:
             ${{ runner.os }}-bun-cache-
 
       - name: Prepare build dependencies and cross tools via Go script
-        id: prepare_tools
         shell: bash
         run: |
           set -euo pipefail
@@ -159,10 +158,6 @@ jobs:
       - name: Build release artifacts
         shell: bash
         working-directory: workspace
-        env:
-          X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_DIR: ${{ steps.prepare_tools.outputs.x86_64_unknown_linux_musl_openssl_dir }}
-          X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_STATIC: "1"
-          PKG_CONFIG_ALLOW_CROSS: "1"
         run: |
           set -euo pipefail
           rm -rf "$OUTPUT_DIR"
