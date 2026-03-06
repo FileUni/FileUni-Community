@@ -486,7 +486,7 @@ jobs:
     needs: [resolve-meta, build-frontend]
     runs-on: ubuntu-latest
     env:
-      CARGO_TOOLS_ROOT: ${{ runner.temp }}/cargo-tools
+      CARGO_TOOLS_ROOT: ${{ github.workspace }}/.cargo-tools
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.resolve-meta.outputs.android_matrix) }}
@@ -629,7 +629,7 @@ jobs:
     needs: [resolve-meta, build-frontend]
     runs-on: macos-14
     env:
-      CARGO_TOOLS_ROOT: ${{ runner.temp }}/cargo-tools
+      CARGO_TOOLS_ROOT: ${{ github.workspace }}/.cargo-tools
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.resolve-meta.outputs.apple_bundle_matrix) }}
