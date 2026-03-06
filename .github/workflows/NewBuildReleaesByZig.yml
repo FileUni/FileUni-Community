@@ -498,7 +498,7 @@ jobs:
   build-apple:
     if: needs.resolve-meta.outputs.has_apple_target == 'true'
     needs: [resolve-meta, build-frontend, preflight-release-smoke]
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       FILEUNI_APPS: ${{ needs.resolve-meta.outputs.apple_apps }}
       FILEUNI_TARGET_INCLUDE_GLOB: ${{ needs.resolve-meta.outputs.apple_include_glob }}
