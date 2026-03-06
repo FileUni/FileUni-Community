@@ -477,6 +477,7 @@ jobs:
             --install-xwin "true" \
             --install-tauri "true" \
             --install-sccache "true" \
+            --required-tools "cargo-zigbuild,cargo-xwin,cargo-tauri,sccache,fpm,opkg-build,upx,appimagetool" \
             --github-token "${FILEUNI_GITHUB_TOKEN}"
 
       - name: Build release artifacts (linux/windows/bsd)
@@ -643,6 +644,7 @@ jobs:
             --install-xwin "false" \
             --install-tauri "true" \
             --install-sccache "false" \
+            --required-tools "cargo-tauri" \
             --github-token "${FILEUNI_GITHUB_TOKEN}"
 
       - name: Build release artifacts (apple)
@@ -839,6 +841,7 @@ jobs:
             --install-xwin "false" \
             --install-tauri "true" \
             --install-sccache "true" \
+            --required-tools "cargo-tauri,sccache" \
             --github-token "${FILEUNI_GITHUB_TOKEN}"
 
       - name: Build release artifacts (android)
