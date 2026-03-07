@@ -135,7 +135,9 @@ jobs:
 
       - name: Build via cargo-dist
         working-directory: workspace
-        run: dist build --target "${{ matrix.target }}" --artifacts=local
+        run: |
+          pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fileuni") | .version')"
+          dist build --tag="v${pkg_version}" --target "${{ matrix.target }}" --artifacts=local
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
