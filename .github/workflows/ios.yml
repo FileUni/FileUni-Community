@@ -118,78 +118,28 @@ jobs:
             tauri ios init --ci
           fi
 
-          # Provide Node-resolvable tauri shim for Xcode scripts that call: node gen/apple/tauri ...
-          printf '%s\n' \
-            '#!/usr/bin/env node' \
-            "const { spawnSync } = require('node:child_process');" \
-            "const tauri = process.env.HOME + '/.cargo/bin/tauri';" \
-            "const result = spawnSync(tauri, process.argv.slice(2), { stdio: 'inherit' });" \
-            'if (result.error) {' \
-            '  console.error(result.error);' \
-            '  process.exit(1);' \
-            '}' \
-            'process.exit(result.status ?? 1);' \
-            > gen/apple/tauri
-          chmod +x gen/apple/tauri
-
       - name: Build iOS unsigned app
         working-directory: workspace/apps/gui
         shell: bash
         run: |
           set -euo pipefail
           export PATH="${HOME}/.cargo/bin:${PATH}"
-          export TAURI_CLI_PATH="${HOME}/.cargo/bin/tauri"
 
           if [ ! -d "gen/apple" ]; then
             tauri ios init --ci
           fi
 
-          # Provide Node-resolvable tauri shim for Xcode scripts that call: node gen/apple/tauri ...
-          printf '%s\n' \
-            '#!/usr/bin/env node' \
-            "const { spawnSync } = require('node:child_process');" \
-            "const tauri = process.env.HOME + '/.cargo/bin/tauri';" \
-            "const result = spawnSync(tauri, process.argv.slice(2), { stdio: 'inherit' });" \
-            'if (result.error) {' \
-            '  console.error(result.error);' \
-            '  process.exit(1);' \
-            '}' \
-            'process.exit(result.status ?? 1);' \
-            > gen/apple/tauri
-          chmod +x gen/apple/tauri
-
-          echo "PATH=${PATH}"
-          command -v tauri
-          command -v cargo-tauri
-
-          workspace_path="$(find gen/apple -type d -name '*.xcworkspace' | head -1 || true)"
-          project_path="$(find gen/apple -type d -name '*.xcodeproj' | head -1 || true)"
-
-          build_target_args=()
-          if [ -n "${workspace_path}" ] && [ -d "${workspace_path}" ]; then
-            build_target_args=(-workspace "${workspace_path}")
-          elif [ -n "${project_path}" ] && [ -d "${project_path}" ]; then
-            build_target_args=(-project "${project_path}")
-          else
-            echo "::error::No iOS Xcode workspace/project found under gen/apple"
-            find gen/apple -maxdepth 3 -type d | sed -n '1,120p'
-            exit 1
+          no_sign_opt=()
+          if tauri ios build --help | grep -q -- '--no-sign'; then
+            no_sign_opt+=(--no-sign)
           fi
 
-          derived_data="$(pwd)/gen/apple/build"
-          rm -rf "${derived_data}"
-
-          PATH="${PATH}" TAURI_CLI_PATH="${TAURI_CLI_PATH}" xcodebuild \
-            "${build_target_args[@]}" \
-            -scheme fileuni-gui_iOS \
-            -sdk iphoneos \
-            -configuration Release \
-            -derivedDataPath "${derived_data}" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            build | tee /tmp/xcodebuild-ios.log
+          # Use Tauri mobile build entrypoint to ensure internal server-addr lifecycle is prepared.
+          CODE_SIGNING_ALLOWED=NO \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGN_IDENTITY="" \
+          DEVELOPMENT_TEAM="" \
+          tauri ios build --ci --target aarch64 --config tauri.ios.conf.json "${no_sign_opt[@]}" | tee /tmp/xcodebuild-ios.log
 
       - name: Package unsigned IPA
         shell: bash
