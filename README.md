@@ -1,6 +1,6 @@
-# FileUni-Community
+# FileUni
 
-This repository is the public community hub for **FileUni**:
+This repository is the public  hub for **FileUni**:
 - issue discussion and feedback,
 - automated build and release workflows.
 
