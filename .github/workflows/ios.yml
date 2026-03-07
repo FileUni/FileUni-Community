@@ -90,6 +90,10 @@ jobs:
           set -euo pipefail
           bun add -g @tauri-apps/cli@2
           bunx --bun tauri -V
+          mkdir -p "${HOME}/.cargo/bin"
+          printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec bunx --bun tauri "$@"' > "${HOME}/.cargo/bin/cargo-tauri"
+          chmod +x "${HOME}/.cargo/bin/cargo-tauri"
+          cargo-tauri -V
 
       - name: Initialize iOS project if missing
         working-directory: workspace/apps/gui
@@ -110,12 +114,26 @@ jobs:
             bunx --bun tauri ios init --ci
           fi
 
-          build_args=(ios build --ci --target aarch64)
-          if [ -f "tauri.ios.conf.json" ]; then
-            build_args+=(--config tauri.ios.conf.json)
+          workspace_path="$(find gen/apple -type d -name '*.xcworkspace' | head -1 || true)"
+          if [ -z "${workspace_path}" ] || [ ! -d "${workspace_path}" ]; then
+            echo "::error::iOS xcworkspace not found under gen/apple"
+            exit 1
           fi
 
-          bunx --bun tauri "${build_args[@]}" | tee /tmp/xcodebuild-ios.log
+          derived_data="$(pwd)/gen/apple/build"
+          rm -rf "${derived_data}"
+
+          xcodebuild \
+            -workspace "${workspace_path}" \
+            -scheme fileuni-gui_iOS \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath "${derived_data}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build | tee /tmp/xcodebuild-ios.log
 
       - name: Package unsigned IPA
         shell: bash
