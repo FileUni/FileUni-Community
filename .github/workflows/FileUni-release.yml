@@ -1372,13 +1372,13 @@ jobs:
           derived_data="$(pwd)/gen/apple/build"
           cat > "${ci_xcconfig}" <<'XCCONFIG'
           TOOLCHAINS = com.apple.dt.toolchain.XcodeDefault
-          LIBRARY_SEARCH_PATHS = $(inherited) $(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(DT_TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)
+          LIBRARY_SEARCH_PATHS = $(inherited) $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)
           XCCONFIG
 
           # Force generated Xcode project to unsigned mode.
           project_pbxproj="gen/apple/fileuni-gui.xcodeproj/project.pbxproj"
           if [ -f "${project_pbxproj}" ]; then
-            perl -0777 -i -pe 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g; s/CODE_SIGN_STYLE = [^;]*;/CODE_SIGN_STYLE = Manual;/g; s/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g; s/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g; s/PROVISIONING_PROFILE = [^;]*;/PROVISIONING_PROFILE = "";/g; s/\$\(TOOLCHAIN_DIR\)/\$\(DT_TOOLCHAIN_DIR\)/g;' "${project_pbxproj}"
+            perl -0777 -i -pe 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g; s/CODE_SIGN_STYLE = [^;]*;/CODE_SIGN_STYLE = Manual;/g; s/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g; s/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g; s/PROVISIONING_PROFILE = [^;]*;/PROVISIONING_PROFILE = "";/g;' "${project_pbxproj}"
           fi
 
           rm -rf "${derived_data}"
