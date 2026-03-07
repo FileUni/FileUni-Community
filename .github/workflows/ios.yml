@@ -84,38 +84,29 @@ jobs:
           workspaces: workspace
           key: ios-aarch64-apple-ios
 
-      - name: Setup Tauri CLI (Bun)
-        shell: bash
-        run: |
-          set -euo pipefail
-          bun add -g @tauri-apps/cli@2
-          "${HOME}/.bun/bin/tauri" -V
-          mkdir -p "${HOME}/.cargo/bin"
-          printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec "${HOME}/.bun/bin/tauri" "$@"' > "${HOME}/.cargo/bin/cargo-tauri"
-          chmod +x "${HOME}/.cargo/bin/cargo-tauri"
-          printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec "${HOME}/.bun/bin/tauri" "$@"' > "${HOME}/.cargo/bin/tauri"
-          chmod +x "${HOME}/.cargo/bin/tauri"
+      - name: Install cargo-tauri CLI
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli@2
 
-          # Ensure `tauri` can be found by Xcode script PATH.
-          if [ -d "/usr/local/bin" ]; then
-            if [ -w "/usr/local/bin" ]; then
-              ln -sf "${HOME}/.cargo/bin/tauri" /usr/local/bin/tauri
-            else
-              sudo ln -sf "${HOME}/.cargo/bin/tauri" /usr/local/bin/tauri
-            fi
-          fi
-
-          cargo-tauri -V
-          tauri -V
-
-      - name: Initialize iOS project if missing
+      - name: Recreate iOS project (deterministic)
         working-directory: workspace/apps/gui
         shell: bash
         run: |
           set -euo pipefail
-          export PATH="${HOME}/.cargo/bin:${PATH}"
-          if [ ! -d "gen/apple" ]; then
-            tauri ios init --ci
+          cargo tauri -V
+          rm -rf gen/apple
+          cargo tauri ios init --ci
+
+      - name: Ensure Xcode Tauri bridge script exists
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: |
+          set -euo pipefail
+          bridge="gen/apple/tauri"
+          if [ ! -f "${bridge}" ]; then
+            printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec cargo tauri "$@"' > "${bridge}"
+            chmod +x "${bridge}"
           fi
 
       - name: Build iOS unsigned app
@@ -123,11 +114,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export PATH="${HOME}/.cargo/bin:${PATH}"
-
-          if [ ! -d "gen/apple" ]; then
-            tauri ios init --ci
-          fi
 
           # Force generated Xcode project to unsigned mode.
           project_pbxproj="gen/apple/fileuni-gui.xcodeproj/project.pbxproj"
@@ -136,7 +122,7 @@ jobs:
           fi
 
           # Use Tauri iOS build entrypoint so internal server-addr lifecycle is correctly managed.
-          if tauri ios build --help | grep -q -- '--no-sign'; then
+          if cargo tauri ios build --help | grep -q -- '--no-sign'; then
             APPLE_CERTIFICATE="" \
             APPLE_CERTIFICATE_PASSWORD="" \
             APPLE_SIGNING_IDENTITY="" \
@@ -145,7 +131,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            tauri ios build --ci --target aarch64 --config tauri.ios.conf.json --no-sign | tee /tmp/xcodebuild-ios.log
+            cargo tauri ios build --ci --target aarch64 --config tauri.ios.conf.json --no-sign | tee /tmp/xcodebuild-ios.log
           else
             APPLE_CERTIFICATE="" \
             APPLE_CERTIFICATE_PASSWORD="" \
@@ -155,7 +141,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            tauri ios build --ci --target aarch64 --config tauri.ios.conf.json | tee /tmp/xcodebuild-ios.log
+            cargo tauri ios build --ci --target aarch64 --config tauri.ios.conf.json | tee /tmp/xcodebuild-ios.log
           fi
 
       - name: Package unsigned IPA
