@@ -295,7 +295,7 @@ jobs:
           path: dist/*
 
   # ============================================================
-  # BSD builds via vmactions (FreeBSD/NetBSD native VM)
+  # BSD builds via vmactions (FreeBSD native VM)
   # ============================================================
   build-cli-bsd:
     needs: build-frontends
