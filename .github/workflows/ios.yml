@@ -129,6 +129,22 @@ jobs:
             exit 1
           fi
 
+          # Force Xcode run script to use absolute tauri path.
+          project_pbxproj="gen/apple/fileuni-gui.xcodeproj/project.pbxproj"
+          if [ -f "${project_pbxproj}" ]; then
+            python3 - <<'PY'
+            from pathlib import Path
+            import os
+            p = Path("gen/apple/fileuni-gui.xcodeproj/project.pbxproj")
+            s = p.read_text()
+            abs_tauri = f"{os.environ['HOME']}/.cargo/bin/tauri"
+            s2 = s.replace("\"tauri\"", f"\"{abs_tauri}\"")
+            s2 = s2.replace(" tauri ", f" {abs_tauri} ")
+            if s2 != s:
+                p.write_text(s2)
+            PY
+          fi
+
           derived_data="$(pwd)/gen/apple/build"
           rm -rf "${derived_data}"
 
