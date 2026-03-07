@@ -129,17 +129,20 @@ jobs:
             tauri ios init --ci
           fi
 
-          no_sign_opt=()
-          if tauri ios build --help | grep -q -- '--no-sign'; then
-            no_sign_opt+=(--no-sign)
-          fi
-
           # Use Tauri mobile build entrypoint to ensure internal server-addr lifecycle is prepared.
-          CODE_SIGNING_ALLOWED=NO \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGN_IDENTITY="" \
-          DEVELOPMENT_TEAM="" \
-          tauri ios build --ci --target aarch64 --config tauri.ios.conf.json "${no_sign_opt[@]}" | tee /tmp/xcodebuild-ios.log
+          if tauri ios build --help | grep -q -- '--no-sign'; then
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            tauri ios build --ci --target aarch64 --config tauri.ios.conf.json --no-sign | tee /tmp/xcodebuild-ios.log
+          else
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            tauri ios build --ci --target aarch64 --config tauri.ios.conf.json | tee /tmp/xcodebuild-ios.log
+          fi
 
       - name: Package unsigned IPA
         shell: bash
