@@ -39,6 +39,7 @@
       { "runner": "windows-latest", "target": "x86_64-pc-windows-msvc",       "bundles": "",         "artifact_ext": ".exe",      "mode": ["full"] },
       { "runner": "ubuntu-latest",  "target": "x86_64-unknown-linux-gnu",      "bundles": "appimage", "artifact_ext": ".AppImage", "mode": ["minimal", "full"] },
       { "runner": "ubuntu-24.04-arm", "target": "aarch64-unknown-linux-gnu",   "bundles": "appimage", "artifact_ext": ".AppImage", "mode": ["full"] },
+      { "runner": "macos-15",       "target": "x86_64-apple-darwin",          "bundles": "dmg",      "artifact_ext": ".dmg",      "mode": ["full"] },
       { "runner": "macos-15",       "target": "aarch64-apple-darwin",          "bundles": "dmg",      "artifact_ext": ".dmg",      "mode": ["full"] }
     ]
   }

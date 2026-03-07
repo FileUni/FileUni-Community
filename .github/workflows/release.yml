@@ -358,17 +358,89 @@ jobs:
             exit 1
           fi
 
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux-android* ]]; then
+            os="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            os="freebsd"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          elif [[ "${target}" == *android* ]]; then
+            libc="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            libc="freebsd"
+          else
+            libc="native"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
           mkdir -p dist-fallback
           if [[ "${target}" == *windows* ]]; then
-            zip "dist-fallback/fileuni-${target}.zip" "${bin}"
+            zip -j "dist-fallback/${base}.exe.zip" "${bin}"
           else
-            tar -cJf "dist-fallback/fileuni-${target}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+            tar -cJf "dist-fallback/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
           fi
 
       - name: Package raw binary zip
         shell: bash
         run: |
           target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux-android* ]]; then
+            os="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            os="freebsd"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          elif [[ "${target}" == *android* ]]; then
+            libc="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            libc="freebsd"
+          else
+            libc="native"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
           if [[ "${target}" == *windows* ]]; then
             bin="workspace/target/${target}/release/fileuni.exe"
             if [ ! -f "${bin}" ]; then
@@ -387,13 +459,53 @@ jobs:
           fi
 
           mkdir -p dist-raw
-          zip -j "dist-raw/fileuni-${target}.zip" "${bin}"
+          if [[ "${target}" == *windows* ]]; then
+            zip -j "dist-raw/${base}.exe.zip" "${bin}"
+          else
+            zip -j "dist-raw/${base}.zip" "${bin}"
+          fi
 
       - name: Create UPX raw binary zip
         if: github.event.inputs.enable_upx != 'false'
         shell: bash
         run: |
           target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux-android* ]]; then
+            os="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            os="freebsd"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          elif [[ "${target}" == *android* ]]; then
+            libc="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            libc="freebsd"
+          else
+            libc="native"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
           if [[ "${target}" == *windows* ]]; then
             bin="workspace/target/${target}/release/fileuni.exe"
             if [ ! -f "${bin}" ]; then
@@ -459,7 +571,11 @@ jobs:
           "${upx_cmd}" --best --lzma "${upx_bin}"
 
           mkdir -p dist-upx
-          zip -j "dist-upx/fileuni-${target}-upx.zip" "${upx_bin}"
+          if [[ "${target}" == *windows* ]]; then
+            zip -j "dist-upx/${base}.upx.exe.zip" "${upx_bin}"
+          else
+            zip -j "dist-upx/${base}.upx.zip" "${upx_bin}"
+          fi
 
       - name: Upload UPX artifacts
         if: github.event.inputs.enable_upx != 'false'
@@ -528,22 +644,94 @@ jobs:
       - name: Package binary
         run: |
           target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux-android* ]]; then
+            os="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            os="freebsd"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          elif [[ "${target}" == *android* ]]; then
+            libc="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            libc="freebsd"
+          else
+            libc="native"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
           bin="workspace/target/${target}/release/fileuni"
           if [ ! -f "${bin}" ]; then
             bin="workspace/target/${target}/release/fileuni.exe"
           fi
           mkdir -p dist
           if echo "${target}" | grep -q "windows"; then
-            zip "dist/fileuni-${target}.zip" "${bin}"
+            zip -j "dist/${base}.exe.zip" "${bin}"
           else
-            zip "dist/fileuni-${target}.zip" "${bin}"
-            tar -cJf "dist/fileuni-${target}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+            zip -j "dist/${base}.zip" "${bin}"
+            tar -cJf "dist/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
           fi
 
       - name: Create UPX-compressed copy
         if: github.event.inputs.enable_upx != 'false'
         run: |
           target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux-android* ]]; then
+            os="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            os="freebsd"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          elif [[ "${target}" == *android* ]]; then
+            libc="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            libc="freebsd"
+          else
+            libc="native"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
           bin="workspace/target/${target}/release/fileuni"
           if [ ! -f "${bin}" ]; then
             echo "::error::Binary not found for UPX: ${bin}"
@@ -556,8 +744,8 @@ jobs:
           upx --best --lzma "${bin}-upx"
 
           mkdir -p dist-upx
-          zip -j "dist-upx/fileuni-${target}-upx.zip" "${bin}-upx"
-          tar -cJf "dist-upx/fileuni-${target}-upx.tar.xz" -C "$(dirname "${bin}")" "fileuni-upx"
+          zip -j "dist-upx/${base}.upx.zip" "${bin}-upx"
+          tar -cJf "dist-upx/${base}.upx.tar.xz" -C "$(dirname "${bin}")" "fileuni-upx"
 
       - name: Upload UPX artifacts
         if: github.event.inputs.enable_upx != 'false'
@@ -618,6 +806,16 @@ jobs:
       - name: Package binary
         run: |
           target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          os="android"
+          libc="android"
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
           bin="$(find workspace/target -path "*/release/fileuni" | grep "${target}" | head -1 || true)"
           if [ -z "${bin}" ]; then
             echo "::error::Android binary not found for ${target}"
@@ -625,13 +823,21 @@ jobs:
             exit 1
           fi
           mkdir -p dist
-          zip -j "dist/fileuni-${target}.zip" "${bin}"
-          tar -cJf "dist/fileuni-${target}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+          zip -j "dist/${base}.zip" "${bin}"
+          tar -cJf "dist/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
 
       - name: Create UPX-compressed copy
         if: github.event.inputs.enable_upx != 'false'
         run: |
           target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          base="FileUni-cli-${arch}-android-android"
+
           bin="$(find workspace/target -path "*/release/fileuni" | grep "${target}" | head -1 || true)"
           if [ -z "${bin}" ] || [ ! -f "${bin}" ]; then
             echo "::error::Android binary not found for UPX: ${target}"
@@ -646,7 +852,7 @@ jobs:
           upx --best --lzma "${upx_bin}"
 
           mkdir -p dist-upx
-          zip -j "dist-upx/fileuni-${target}-upx.zip" "${upx_bin}"
+          zip -j "dist-upx/${base}.upx.zip" "${upx_bin}"
 
       - name: Upload UPX artifacts
         if: github.event.inputs.enable_upx != 'false'
@@ -748,6 +954,35 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          else
+            libc="native"
+          fi
+          base="FileUni-gui-${arch}-${os}-${libc}"
+
           if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
             file="workspace/target/${{ matrix.target }}/release/fileuni-gui.exe"
             if [ ! -f "${file}" ]; then
@@ -767,13 +1002,33 @@ jobs:
             echo "::error::No GUI artifact found for target ${{ matrix.target }}"
             exit 1
           fi
-          cp "${file}" "dist/"
+          if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
+            zip -j "dist/${base}.exe.zip" "${file}"
+          else
+            ext="${file##*.}"
+            cp "${file}" "dist/${base}.${ext}"
+          fi
 
       - name: Create GUI Windows UPX-compressed copy
         if: matrix.target == 'x86_64-pc-windows-msvc' && github.event.inputs.enable_upx != 'false'
         shell: bash
         run: |
-          src="$(find dist -maxdepth 1 -type f -name '*.exe' | head -1)"
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          base="FileUni-gui-${arch}-windows-msvc"
+
+          src="workspace/target/${target}/release/fileuni-gui.exe"
+          if [ ! -f "${src}" ]; then
+            src="$(find workspace/target/${target}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
+          fi
+          if [ -z "${src}" ] || [ ! -f "${src}" ]; then
+            src="$(find workspace/apps/gui/target/${target}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
+          fi
           if [ -z "${src}" ]; then
             echo "::error::No Windows GUI exe found for UPX"
             exit 1
@@ -807,16 +1062,17 @@ jobs:
           fi
 
           mkdir -p dist-upx
-          out="dist-upx/$(basename "${src%.exe}")-upx.exe"
+          out="dist-upx/${base}.upx.exe"
           cp "${src}" "${out}"
           "$upx_bin" --best --lzma "${out}"
+          zip -j "dist-upx/${base}.upx.exe.zip" "${out}"
 
       - name: Upload GUI Windows UPX artifact
         if: matrix.target == 'x86_64-pc-windows-msvc' && github.event.inputs.enable_upx != 'false'
         uses: actions/upload-artifact@v4
         with:
           name: gui-${{ matrix.target }}-upx
-          path: dist-upx/*
+          path: dist-upx/*.zip
           if-no-files-found: error
 
       - name: Upload GUI artifacts
@@ -873,26 +1129,42 @@ jobs:
       - name: Package binary
         run: |
           target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          base="FileUni-cli-${arch}-freebsd-freebsd"
+
           bin="workspace/target/release/fileuni"
           if [ ! -f "${bin}" ]; then
             echo "::error::Binary not found at ${bin}"
             exit 1
           fi
           mkdir -p dist
-          zip -j "dist/fileuni-${target}.zip" "${bin}"
-          tar -cJf "dist/fileuni-${target}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+          zip -j "dist/${base}.zip" "${bin}"
+          tar -cJf "dist/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
 
       - name: Package UPX binary
         if: github.event.inputs.enable_upx != 'false'
         run: |
           target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          base="FileUni-cli-${arch}-freebsd-freebsd"
+
           upx_bin="workspace/target/release/fileuni-upx"
           if [ ! -f "${upx_bin}" ]; then
             echo "::error::FreeBSD UPX binary not found at ${upx_bin}"
             exit 1
           fi
           mkdir -p dist-upx
-          zip -j "dist-upx/fileuni-${target}-upx.zip" "${upx_bin}"
+          zip -j "dist-upx/${base}.upx.zip" "${upx_bin}"
 
       - name: Upload UPX artifacts
         if: github.event.inputs.enable_upx != 'false'
@@ -934,7 +1206,7 @@ jobs:
       - name: Extract binary
         run: |
           mkdir -p binary
-          file="$(find artifact -type f -name 'fileuni-*.tar.xz' | head -1)"
+          file="$(find artifact -type f -name '*.tar.xz' | head -1)"
           if [ -n "${file}" ]; then
             tar -xJf "${file}" -C binary
           else
@@ -989,8 +1261,35 @@ jobs:
           mkdir -p packages
           target="${{ matrix.target }}"
 
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          os="linux"
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          else
+            libc="linux"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
           for fmt in deb rpm apk archlinux ipk; do
             nfpm package --packager "${fmt}" --config nfpm.yaml --target "packages/" 2>&1 || echo "::warning::${fmt} packaging failed for ${target}"
+          done
+
+          shopt -s nullglob
+          for p in packages/*; do
+            name="$(basename "${p}")"
+            if [[ "${name}" == *.pkg.tar.zst ]]; then
+              ext="pkg.tar.zst"
+            else
+              ext="${name##*.}"
+            fi
+            mv "${p}" "packages/${base}.${ext}"
           done
 
           ls -la packages/
@@ -1012,6 +1311,15 @@ jobs:
           pattern: "{cli-*,gui-*,packages-*}"
           path: /tmp/release
           merge-multiple: true
+
+      - name: Keep only standardized release filenames
+        run: |
+          find /tmp/release -type f | while read -r f; do
+            bn="$(basename "$f")"
+            if [[ "$bn" != FileUni-* ]]; then
+              rm -f "$f"
+            fi
+          done
 
       - name: List release files
         run: |
