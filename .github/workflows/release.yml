@@ -196,12 +196,9 @@ jobs:
           - { target: riscv64gc-unknown-linux-gnu,   nfpm_arch: riscv64, upx: false, tier: 2 }
           # --- Linux PowerPC ---
           - { target: powerpc64le-unknown-linux-gnu, nfpm_arch: ppc64le, upx: false, tier: 2 }
-          # --- Linux MIPS (OpenWrt routers, Tier 3 — requires nightly) ---
-          - { target: mipsel-unknown-linux-musl,     nfpm_arch: mipsel,  upx: true,  tier: 3 }
+          # --- Linux MIPS (Tier 3, requires nightly + build-std via Cross.toml) ---
+          - { target: mipsel-unknown-linux-musl,       nfpm_arch: mipsel,   upx: true,  tier: 3 }
           - { target: mips64el-unknown-linux-muslabi64, nfpm_arch: mips64el, upx: false, tier: 3 }
-          # --- BSD (no cross Docker image, disabled for now) ---
-          # - { target: x86_64-unknown-freebsd,        nfpm_arch: "",      upx: false, tier: 2 }
-          # - { target: x86_64-unknown-netbsd,         nfpm_arch: "",      upx: false, tier: 2 }
     runs-on: ubuntu-latest
     steps:
       - name: Checkout workspace
@@ -219,10 +216,17 @@ jobs:
           name: frontend-dist
           path: workspace/frontends/cli/dist
 
-      - name: Setup Rust
+      - name: Setup Rust (stable)
+        if: matrix.tier == 2
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.tier == 2 && matrix.target || '' }}
+          targets: ${{ matrix.target }}
+
+      - name: Setup Rust (nightly for Tier 3 build-std)
+        if: matrix.tier == 3
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
 
       - name: Install cross
         uses: taiki-e/install-action@v2
@@ -237,7 +241,12 @@ jobs:
 
       - name: Build via cross
         working-directory: workspace
-        run: cross build --release --package fileuni --target "${{ matrix.target }}"
+        run: |
+          if [ "${{ matrix.tier }}" = "3" ]; then
+            cross +nightly build --release --package fileuni --target "${{ matrix.target }}"
+          else
+            cross build --release --package fileuni --target "${{ matrix.target }}"
+          fi
 
       - name: Package binary
         run: |
@@ -286,6 +295,81 @@ jobs:
           path: dist/*
 
   # ============================================================
+  # BSD builds via vmactions (FreeBSD/NetBSD native VM)
+  # ============================================================
+  build-cli-bsd:
+    needs: build-frontends
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: freebsd, release: "14.2", target: x86_64-unknown-freebsd }
+          - { os: netbsd,  release: "10.1", target: x86_64-unknown-netbsd  }
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.build-frontends.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: workspace/frontends/cli/dist
+
+      - name: Build on FreeBSD
+        if: matrix.os == 'freebsd'
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          copyback: true
+          mem: 8192
+          prepare: |
+            pkg install -y rust curl
+          run: |
+            cd workspace
+            cargo build --release --package fileuni
+            ls -la target/release/fileuni
+
+      - name: Build on NetBSD
+        if: matrix.os == 'netbsd'
+        uses: vmactions/netbsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          copyback: true
+          mem: 8192
+          prepare: |
+            /usr/sbin/pkg_add rust curl
+          run: |
+            cd workspace
+            cargo build --release --package fileuni
+            ls -la target/release/fileuni
+
+      - name: Package binary
+        run: |
+          target="${{ matrix.target }}"
+          bin="workspace/target/release/fileuni"
+          if [ ! -f "${bin}" ]; then
+            echo "::error::Binary not found at ${bin}"
+            exit 1
+          fi
+          mkdir -p dist
+          tar -cJf "dist/fileuni-${target}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: dist/*
+
+  # ============================================================
   # Linux packaging via nFPM (deb/rpm/apk/archlinux/ipk)
   # Runs after all Linux builds complete, packages each arch.
   # ============================================================
@@ -307,7 +391,7 @@ jobs:
           - { target: armv7-unknown-linux-musleabihf, nfpm_arch: armhf,   artifact: cli-armv7-unknown-linux-musleabihf }
           - { target: riscv64gc-unknown-linux-gnu,   nfpm_arch: riscv64, artifact: cli-riscv64gc-unknown-linux-gnu }
           - { target: powerpc64le-unknown-linux-gnu, nfpm_arch: ppc64le, artifact: cli-powerpc64le-unknown-linux-gnu }
-          - { target: mipsel-unknown-linux-musl,     nfpm_arch: mipsel,  artifact: cli-mipsel-unknown-linux-musl }
+          - { target: mipsel-unknown-linux-musl,       nfpm_arch: mipsel,   artifact: cli-mipsel-unknown-linux-musl }
           - { target: mips64el-unknown-linux-muslabi64, nfpm_arch: mips64el, artifact: cli-mips64el-unknown-linux-muslabi64 }
     steps:
       - name: Download binary artifact
@@ -369,7 +453,7 @@ jobs:
           path: packages/*
 
   publish:
-    needs: [build-frontends, build-cli-cross, package-linux]
+    needs: [build-frontends, build-cli-cross, build-cli-bsd, package-linux]
     # needs: [build-frontends, build-cli, build-cli-cross, package-linux]  # uncomment when build-cli is active
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
