@@ -132,19 +132,7 @@ jobs:
           # Force generated Xcode project to unsigned mode.
           project_pbxproj="gen/apple/fileuni-gui.xcodeproj/project.pbxproj"
           if [ -f "${project_pbxproj}" ]; then
-            python3 - <<'PY'
-            import re
-            from pathlib import Path
-
-            p = Path("gen/apple/fileuni-gui.xcodeproj/project.pbxproj")
-            s = p.read_text()
-            s = re.sub(r'DEVELOPMENT_TEAM = [^;]*;', 'DEVELOPMENT_TEAM = "";', s)
-            s = re.sub(r'CODE_SIGN_STYLE = [^;]*;', 'CODE_SIGN_STYLE = Manual;', s)
-            s = re.sub(r'CODE_SIGN_IDENTITY = [^;]*;', 'CODE_SIGN_IDENTITY = "";', s)
-            s = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = [^;]*;', 'PROVISIONING_PROFILE_SPECIFIER = "";', s)
-            s = re.sub(r'PROVISIONING_PROFILE = [^;]*;', 'PROVISIONING_PROFILE = "";', s)
-            p.write_text(s)
-            PY
+            perl -0777 -i -pe 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g; s/CODE_SIGN_STYLE = [^;]*;/CODE_SIGN_STYLE = Manual;/g; s/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g; s/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g; s/PROVISIONING_PROFILE = [^;]*;/PROVISIONING_PROFILE = "";/g;' "${project_pbxproj}"
           fi
 
           # Use Tauri iOS build entrypoint so internal server-addr lifecycle is correctly managed.
