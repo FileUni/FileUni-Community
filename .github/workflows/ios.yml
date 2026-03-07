@@ -93,7 +93,10 @@ jobs:
           mkdir -p "${HOME}/.cargo/bin"
           printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec bunx --bun tauri "$@"' > "${HOME}/.cargo/bin/cargo-tauri"
           chmod +x "${HOME}/.cargo/bin/cargo-tauri"
+          printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec bunx --bun tauri "$@"' > "${HOME}/.cargo/bin/tauri"
+          chmod +x "${HOME}/.cargo/bin/tauri"
           cargo-tauri -V
+          tauri -V
 
       - name: Initialize iOS project if missing
         working-directory: workspace/apps/gui
