@@ -117,9 +117,9 @@ jobs:
           xcode_dev_dir="$(xcode-select -p)"
           default_toolchain="${xcode_dev_dir}/Toolchains/XcodeDefault.xctoolchain"
           ci_xcconfig="/tmp/fileuni-ios-ci.xcconfig"
-          cat > "${ci_xcconfig}" <<'XCCONFIG'
+          cat > "${ci_xcconfig}" <<XCCONFIG
           TOOLCHAINS = com.apple.dt.toolchain.XcodeDefault
-          LIBRARY_SEARCH_PATHS = $(inherited) $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)
+          LIBRARY_SEARCH_PATHS = ${default_toolchain}/usr/lib/swift/\$(PLATFORM_NAME) ${default_toolchain}/usr/lib/swift-5.0/\$(PLATFORM_NAME)
           XCCONFIG
 
           # Force generated Xcode project to unsigned mode.
