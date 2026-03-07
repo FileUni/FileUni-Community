@@ -56,9 +56,9 @@ jobs:
           ref="${{ steps.resolve-ref.outputs.ref }}"
           echo "workspace_ref=${ref}" >> "$GITHUB_OUTPUT"
 
-          # dist_tag: always from Cargo.toml version (for cargo-dist --tag)
+          # dist_tag: from Cargo.toml version (for cargo-dist --tag)
           pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fileuni") | .version')"
-          echo "dist_tag=fileuni-v${pkg_version}" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=v${pkg_version}" >> "$GITHUB_OUTPUT"
 
           # release_tag: if ref looks like a version tag, use it; otherwise auto-generate
           if echo "${ref}" | grep -qE '^v[0-9]+\.[0-9]+'; then
@@ -68,7 +68,7 @@ jobs:
           fi
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
 
-          echo "::notice::dist_tag=fileuni-v${pkg_version}  release_tag=${release_tag}  ref=${ref}"
+          echo "::notice::dist_tag=v${pkg_version}  release_tag=${release_tag}  ref=${ref}"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
