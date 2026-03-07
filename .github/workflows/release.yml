@@ -3,12 +3,8 @@ name: Release
 on:
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: "Release tag (e.g. v0.1.1-alpha.4.2). Empty = auto from Cargo.toml"
-        required: false
-        default: ""
       workspace_ref:
-        description: "Source ref in FileUni-WorkSpace (branch/tag/sha)"
+        description: "Source ref in FileUni-WorkSpace (tag/branch/sha). Default: main"
         required: false
         default: "main"
       prerelease:
@@ -21,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.event.inputs.release_tag || github.run_id }}
+  group: release-${{ github.run_id }}
   cancel-in-progress: false
 
 env:
@@ -32,12 +28,12 @@ jobs:
   build-frontends:
     runs-on: ubuntu-latest
     outputs:
-      workspace_ref: ${{ steps.ref.outputs.ref }}
+      workspace_ref: ${{ steps.meta.outputs.workspace_ref }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       dist_tag: ${{ steps.meta.outputs.dist_tag }}
     steps:
       - name: Resolve workspace ref
-        id: ref
+        id: resolve-ref
         run: |
           ref="${{ github.event.inputs.workspace_ref }}"
           echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
@@ -46,24 +42,33 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ steps.ref.outputs.ref }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
           token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
           path: workspace
           submodules: true
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Resolve release metadata
         id: meta
         working-directory: workspace
         run: |
+          ref="${{ steps.resolve-ref.outputs.ref }}"
+          echo "workspace_ref=${ref}" >> "$GITHUB_OUTPUT"
+
+          # dist_tag: always from Cargo.toml version (for cargo-dist --tag)
           pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fileuni") | .version')"
-          dist_tag="v${pkg_version}"
+          echo "dist_tag=fileuni-v${pkg_version}" >> "$GITHUB_OUTPUT"
 
-          input_tag="${{ github.event.inputs.release_tag }}"
-          release_tag="${input_tag:-${dist_tag}}"
-
-          echo "dist_tag=${dist_tag}" >> "$GITHUB_OUTPUT"
+          # release_tag: if ref looks like a version tag, use it; otherwise auto-generate
+          if echo "${ref}" | grep -qE '^v[0-9]+\.[0-9]+'; then
+            release_tag="${ref}"
+          else
+            release_tag="Release_$(date -u '+%Y%m%d_%H%M%S')"
+          fi
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
-          echo "::notice::dist_tag=${dist_tag} release_tag=${release_tag}"
+
+          echo "::notice::dist_tag=fileuni-v${pkg_version}  release_tag=${release_tag}  ref=${ref}"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -114,6 +119,8 @@ jobs:
           token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
           path: workspace
           submodules: true
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Download frontend dist
         uses: actions/download-artifact@v4
@@ -182,13 +189,3 @@ jobs:
             ## FileUni ${{ needs.build-frontends.outputs.release_tag }}
 
             Built from [`${{ needs.build-frontends.outputs.workspace_ref }}`](https://github.com/${{ env.WORKSPACE_REPO }}/tree/${{ needs.build-frontends.outputs.workspace_ref }})
-
-            ### Install
-
-            ```bash
-            # Linux/macOS
-            curl --proto '=https' --tlsv1.2 -LsSf https://github.com/FileUni/FileUni-Community/releases/download/${{ needs.build-frontends.outputs.release_tag }}/fileuni-installer.sh | sh
-
-            # Windows
-            powershell -ExecutionPolicy Bypass -c "irm https://github.com/FileUni/FileUni-Community/releases/download/${{ needs.build-frontends.outputs.release_tag }}/fileuni-installer.ps1 | iex"
-            ```
