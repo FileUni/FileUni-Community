@@ -855,7 +855,15 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install cargo-ndk
-        run: cargo install cargo-ndk --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: workspace
+          key: cli-android-${{ matrix.target }}
 
       - name: Build Android binary
         working-directory: workspace
@@ -964,6 +972,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: workspace
+          key: gui-desktop-${{ matrix.target }}
+
       - name: Install Linux dependencies for Tauri
         if: startsWith(matrix.runner, 'ubuntu')
         run: |
@@ -976,8 +990,9 @@ jobs:
             patchelf
 
       - name: Install cargo-tauri CLI
-        working-directory: workspace/apps/gui
-        run: cargo install tauri-cli --version '^2.0' --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli@2
 
       - name: Build GUI bundles (unsigned)
         working-directory: workspace/apps/gui
@@ -1206,14 +1221,22 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
+          cache: gradle
 
       - name: Setup Android SDK/NDK
         uses: android-actions/setup-android@v3
 
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: workspace
+          key: gui-android-${{ matrix.target }}
+
       - name: Install cargo-tauri CLI
-        working-directory: workspace/apps/gui
-        run: cargo install tauri-cli --version '^2.0' --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli@2
 
       - name: Initialize Android project if missing
         working-directory: workspace/apps/gui
@@ -1309,9 +1332,16 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: workspace
+          key: gui-ios-${{ matrix.target }}
+
       - name: Install cargo-tauri CLI
-        working-directory: workspace/apps/gui
-        run: cargo install tauri-cli --version '^2.0' --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli@2
 
       - name: Initialize iOS project if missing
         working-directory: workspace/apps/gui
@@ -1601,7 +1631,18 @@ jobs:
           path: packages/*
 
   publish:
-    needs: [resolve-matrix, build-cli, build-cli-cross, build-cli-android, build-cli-bsd, build-gui, build-gui-android, build-gui-ios, package-linux]
+    needs:
+      [
+        resolve-matrix,
+        build-cli,
+        build-cli-cross,
+        build-cli-android,
+        build-cli-bsd,
+        build-gui,
+        build-gui-android,
+        build-gui-ios,
+        package-linux,
+      ]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     runs-on: ubuntu-latest
     steps:
@@ -1675,6 +1716,23 @@ jobs:
               rm -f "$f"
             fi
           done
+
+      - name: Block source-code artifacts from release payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          bad="$(find /tmp/release -type f \( \
+            -name '*.rs' -o -name '*.lock'  \
+            -o -name '*.yaml' -o -name '*.ts' -o -name '*.tsx' \
+            -o -name '*.js' -o -name '*.jsx' -o -name '*.c' -o -name '*.h' -o -name '*.cpp' -o -name '*.hpp' \
+            -o -name '*.java' -o -name '*.kt' -o -name '*.swift' -o -name '*.go' \
+            -o -name '*.rb' -o -name '*.php' -o  \
+          \) -print || true)"
+          if [ -n "${bad}" ]; then
+            echo "::error::Source-like files detected in release payload:"
+            printf '%s\n' "${bad}"
+            exit 1
+          fi
 
       - name: List release files
         run: |
