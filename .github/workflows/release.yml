@@ -1197,11 +1197,6 @@ jobs:
           name: frontend-cli-dist
           path: workspace/frontends/cli/dist
 
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: latest-stable
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -1303,6 +1298,11 @@ jobs:
         with:
           name: frontend-cli-dist
           path: workspace/frontends/cli/dist
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
