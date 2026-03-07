@@ -112,10 +112,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          export PATH="${HOME}/.cargo/bin:${PATH}"
+          export TAURI_CLI_PATH="${HOME}/.cargo/bin/tauri"
 
           if [ ! -d "gen/apple" ]; then
             bunx --bun tauri ios init --ci
           fi
+
+          echo "PATH=${PATH}"
+          command -v tauri
+          command -v cargo-tauri
+          tauri -V
 
           workspace_path="$(find gen/apple -type d -name '*.xcworkspace' | head -1 || true)"
           if [ -z "${workspace_path}" ] || [ ! -d "${workspace_path}" ]; then
@@ -126,7 +133,7 @@ jobs:
           derived_data="$(pwd)/gen/apple/build"
           rm -rf "${derived_data}"
 
-          xcodebuild \
+          PATH="${PATH}" TAURI_CLI_PATH="${TAURI_CLI_PATH}" xcodebuild \
             -workspace "${workspace_path}" \
             -scheme fileuni-gui_iOS \
             -sdk iphoneos \
