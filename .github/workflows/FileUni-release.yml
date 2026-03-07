@@ -1582,12 +1582,67 @@ jobs:
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout workspace source for release notes
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          fetch-depth: 0
+          fetch-tags: true
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: "{cli-*,gui-*,packages-*}"
           path: /tmp/release
           merge-multiple: true
+
+      - name: Generate release notes from commit history
+        env:
+          WORKSPACE_REF: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          WORKSPACE_REPO: ${{ env.WORKSPACE_REPO }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd workspace
+          git fetch --tags --force >/dev/null 2>&1 || true
+
+          current_ref="${WORKSPACE_REF}"
+          current_sha="$(git rev-parse "${current_ref}")"
+          prev_tag="$(git describe --tags --abbrev=0 "${current_sha}^" 2>/dev/null || true)"
+
+          notes_file="/tmp/release-notes.md"
+          {
+            echo "## Changes"
+            echo
+
+            if [ -n "${prev_tag}" ]; then
+              echo "Range: \`${prev_tag}\` → \`${current_ref}\`"
+              echo
+              commits="$(git log --no-merges --pretty=format:'- %s ([`%h`](https://github.com/'"${WORKSPACE_REPO}"'/commit/%H))' "${prev_tag}..${current_sha}" || true)"
+            else
+              echo "Range: initial history → \`${current_ref}\`"
+              echo
+              commits="$(git log --no-merges --pretty=format:'- %s ([`%h`](https://github.com/'"${WORKSPACE_REPO}"'/commit/%H))' "${current_sha}" || true)"
+            fi
+
+            if [ -z "${commits}" ]; then
+              echo "- No code changes detected in this range."
+            else
+              printf '%s\n' "${commits}" | head -n 200
+            fi
+
+            echo
+            echo "## Source"
+            echo "- Workspace ref: [\`${current_ref}\`](https://github.com/${WORKSPACE_REPO}/tree/${current_ref})"
+            echo "- Commit: [\`${current_sha}\`](https://github.com/${WORKSPACE_REPO}/commit/${current_sha})"
+          } > "${notes_file}"
+
+          echo "Generated release notes preview:"
+          sed -n '1,80p' "${notes_file}"
 
       - name: Keep only standardized release filenames
         run: |
@@ -1617,7 +1672,4 @@ jobs:
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           fail_on_unmatched_files: false
           files: /tmp/release/*
-          body: |
-            ## FileUni ${{ needs.resolve-matrix.outputs.release_tag }}
-
-            Built from [`${{ needs.resolve-matrix.outputs.workspace_ref }}`](https://github.com/${{ env.WORKSPACE_REPO }}/tree/${{ needs.resolve-matrix.outputs.workspace_ref }})
+          body_path: /tmp/release-notes.md
