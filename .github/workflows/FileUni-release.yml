@@ -1329,18 +1329,41 @@ jobs:
           case "${{ matrix.target }}" in
             aarch64-apple-ios) tauri_target="aarch64" ;;
           esac
-          ios_opts=()
-          if cargo tauri ios build --help | grep -q -- '--no-codesign'; then
-            ios_opts+=(--no-codesign)
+
+          if [ ! -d "gen/apple" ]; then
+            cargo tauri ios init --ci
           fi
-          cargo tauri ios build --ci --target "${tauri_target}" --config tauri.ios.conf.json "${ios_opts[@]}"
+
+          workspace_path="$(find gen/apple -type d -name '*.xcworkspace' | head -1 || true)"
+          if [ -z "${workspace_path}" ] || [ ! -d "${workspace_path}" ]; then
+            echo "::error::iOS xcworkspace not found under gen/apple"
+            exit 1
+          fi
+
+          derived_data="$(pwd)/gen/apple/build"
+          rm -rf "${derived_data}"
+
+          xcodebuild \
+            -workspace "${workspace_path}" \
+            -scheme fileuni-gui_iOS \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath "${derived_data}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
 
       - name: Package iOS artifact
         shell: bash
         run: |
           ipa="$(find workspace/apps/gui -type f -name '*.ipa' | head -1 || true)"
           if [ -z "${ipa}" ] || [ ! -f "${ipa}" ]; then
-            app="$(find workspace/apps/gui -type d -name '*.app' | head -1 || true)"
+            app="$(find workspace/apps/gui/gen/apple/build -type d -name '*.app' | head -1 || true)"
+            if [ -z "${app}" ] || [ ! -d "${app}" ]; then
+              app="$(find workspace/apps/gui -type d -name '*.app' | head -1 || true)"
+            fi
             if [ -z "${app}" ] || [ ! -d "${app}" ]; then
               echo "::error::No .ipa or .app artifact found for target ${{ matrix.target }}"
               exit 1
