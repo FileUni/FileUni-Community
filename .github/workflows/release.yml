@@ -365,6 +365,111 @@ jobs:
             tar -cJf "dist-fallback/fileuni-${target}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
           fi
 
+      - name: Package raw binary zip
+        shell: bash
+        run: |
+          target="${{ matrix.target }}"
+          if [[ "${target}" == *windows* ]]; then
+            bin="workspace/target/${target}/release/fileuni.exe"
+            if [ ! -f "${bin}" ]; then
+              bin="$(find workspace/target -type f -name 'fileuni.exe' | grep "${target}" | head -1 || true)"
+            fi
+          else
+            bin="workspace/target/${target}/release/fileuni"
+            if [ ! -f "${bin}" ]; then
+              bin="$(find workspace/target -type f -name 'fileuni' | grep "${target}" | head -1 || true)"
+            fi
+          fi
+
+          if [ ! -f "${bin}" ]; then
+            echo "::error::No raw binary found for ${target}"
+            exit 1
+          fi
+
+          mkdir -p dist-raw
+          zip -j "dist-raw/fileuni-${target}.zip" "${bin}"
+
+      - name: Create UPX raw binary zip
+        if: github.event.inputs.enable_upx != 'false'
+        shell: bash
+        run: |
+          target="${{ matrix.target }}"
+          if [[ "${target}" == *windows* ]]; then
+            bin="workspace/target/${target}/release/fileuni.exe"
+            if [ ! -f "${bin}" ]; then
+              bin="$(find workspace/target -type f -name 'fileuni.exe' | grep "${target}" | head -1 || true)"
+            fi
+          else
+            bin="workspace/target/${target}/release/fileuni"
+            if [ ! -f "${bin}" ]; then
+              bin="$(find workspace/target -type f -name 'fileuni' | grep "${target}" | head -1 || true)"
+            fi
+          fi
+
+          if [ ! -f "${bin}" ]; then
+            echo "::error::No binary found for UPX: ${target}"
+            exit 1
+          fi
+
+          case "${RUNNER_OS}" in
+            Linux)
+              sudo apt-get update -qq
+              sudo apt-get install -y -qq upx-ucl > /dev/null 2>&1
+              upx_cmd="upx"
+              ;;
+            macOS)
+              brew install upx
+              upx_cmd="upx"
+              ;;
+            Windows)
+              downloaded=false
+              for url in \
+                "https://github.com/upx/upx/releases/download/v5.0.0/upx-5.0.0-win64.zip" \
+                "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip"; do
+                if curl -fsSL -o /tmp/upx.zip "${url}"; then
+                  downloaded=true
+                  break
+                fi
+              done
+              if [ "${downloaded}" != "true" ]; then
+                echo "::error::Failed to download UPX binary"
+                exit 1
+              fi
+              python3 - <<'PY'
+              import zipfile
+              zipfile.ZipFile('/tmp/upx.zip').extractall('/tmp/upx')
+              PY
+              upx_cmd="$(find /tmp/upx -type f -iname 'upx.exe' | head -1)"
+              if [ -z "${upx_cmd}" ]; then
+                echo "::error::UPX executable not found"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Unsupported runner OS: ${RUNNER_OS}"
+              exit 1
+              ;;
+          esac
+
+          ext=""
+          if [[ "${bin}" == *.exe ]]; then
+            ext=".exe"
+          fi
+          upx_bin="$(dirname "${bin}")/fileuni-upx${ext}"
+          cp "${bin}" "${upx_bin}"
+          "${upx_cmd}" --best --lzma "${upx_bin}"
+
+          mkdir -p dist-upx
+          zip -j "dist-upx/fileuni-${target}-upx.zip" "${upx_bin}"
+
+      - name: Upload UPX artifacts
+        if: github.event.inputs.enable_upx != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}-upx
+          path: dist-upx/*
+          if-no-files-found: error
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -372,6 +477,7 @@ jobs:
           path: |
             workspace/target/distrib/*
             dist-fallback/*
+            dist-raw/*
 
   # ============================================================
   # Cross-compiled builds (Linux exotic)
@@ -431,6 +537,7 @@ jobs:
           if echo "${target}" | grep -q "windows"; then
             zip "dist/fileuni-${target}.zip" "${bin}"
           else
+            zip "dist/fileuni-${target}.zip" "${bin}"
             tar -cJf "dist/fileuni-${target}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
           fi
 
@@ -450,6 +557,7 @@ jobs:
           upx --best --lzma "${bin}-upx"
 
           mkdir -p dist-upx
+          zip -j "dist-upx/fileuni-${target}-upx.zip" "${bin}-upx"
           tar -cJf "dist-upx/fileuni-${target}-upx.tar.xz" -C "$(dirname "${bin}")" "fileuni-upx"
 
       - name: Upload UPX artifacts
@@ -518,7 +626,36 @@ jobs:
             exit 1
           fi
           mkdir -p dist
+          zip -j "dist/fileuni-${target}.zip" "${bin}"
           tar -cJf "dist/fileuni-${target}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+
+      - name: Create UPX-compressed copy
+        if: github.event.inputs.enable_upx != 'false'
+        run: |
+          target="${{ matrix.target }}"
+          bin="$(find workspace/target -path "*/release/fileuni" | grep "${target}" | head -1 || true)"
+          if [ -z "${bin}" ] || [ ! -f "${bin}" ]; then
+            echo "::error::Android binary not found for UPX: ${target}"
+            exit 1
+          fi
+
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq upx-ucl > /dev/null 2>&1
+
+          upx_bin="$(dirname "${bin}")/fileuni-upx"
+          cp "${bin}" "${upx_bin}"
+          upx --best --lzma "${upx_bin}"
+
+          mkdir -p dist-upx
+          zip -j "dist-upx/fileuni-${target}-upx.zip" "${upx_bin}"
+
+      - name: Upload UPX artifacts
+        if: github.event.inputs.enable_upx != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}-upx
+          path: dist-upx/*
+          if-no-files-found: error
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -723,10 +860,13 @@ jobs:
           copyback: true
           mem: 8192
           prepare: |
-            pkg install -y rust curl
+            pkg install -y rust curl zip upx
           run: |
             cd workspace
             cargo build --release --package fileuni
+            if [ "${{ github.event.inputs.enable_upx }}" != "false" ]; then
+              upx --best --lzma target/release/fileuni -o target/release/fileuni-upx
+            fi
             ls -la target/release/fileuni
 
       - name: Package binary
@@ -738,7 +878,28 @@ jobs:
             exit 1
           fi
           mkdir -p dist
+          zip -j "dist/fileuni-${target}.zip" "${bin}"
           tar -cJf "dist/fileuni-${target}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+
+      - name: Package UPX binary
+        if: github.event.inputs.enable_upx != 'false'
+        run: |
+          target="${{ matrix.target }}"
+          upx_bin="workspace/target/release/fileuni-upx"
+          if [ ! -f "${upx_bin}" ]; then
+            echo "::error::FreeBSD UPX binary not found at ${upx_bin}"
+            exit 1
+          fi
+          mkdir -p dist-upx
+          zip -j "dist-upx/fileuni-${target}-upx.zip" "${upx_bin}"
+
+      - name: Upload UPX artifacts
+        if: github.event.inputs.enable_upx != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}-upx
+          path: dist-upx/*
+          if-no-files-found: error
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
