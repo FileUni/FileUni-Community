@@ -440,14 +440,14 @@ jobs:
           target="${{ matrix.target }}"
           bin="workspace/target/${target}/release/fileuni"
           if [ ! -f "${bin}" ]; then
-            echo "::warning::Binary not found for UPX, skipping"
-            exit 0
+            echo "::error::Binary not found for UPX: ${bin}"
+            exit 1
           fi
 
           sudo apt-get update -qq && sudo apt-get install -y -qq upx-ucl > /dev/null 2>&1
 
           cp "${bin}" "${bin}-upx"
-          upx --best --lzma "${bin}-upx" || { echo "::warning::UPX compression failed for ${target}"; rm -f "${bin}-upx"; exit 0; }
+          upx --best --lzma "${bin}-upx"
 
           mkdir -p dist-upx
           tar -cJf "dist-upx/fileuni-${target}-upx.tar.xz" -C "$(dirname "${bin}")" "fileuni-upx"
@@ -458,7 +458,7 @@ jobs:
         with:
           name: cli-${{ matrix.target }}-upx
           path: dist-upx/*
-          if-no-files-found: ignore
+          if-no-files-found: error
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -572,6 +572,7 @@ jobs:
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
+            xdg-utils \
             patchelf
 
       - name: Install cargo-tauri CLI
@@ -587,7 +588,13 @@ jobs:
           from pathlib import Path
           p = Path('tauri.conf.json')
           cfg = json.loads(p.read_text())
-          cfg.setdefault('bundle', {})['active'] = True
+          bundle = cfg.setdefault('bundle', {})
+          target = "${{ matrix.target }}"
+          if target == 'x86_64-pc-windows-msvc':
+            # Windows: build raw .exe only, no msi/nsis bundling
+            bundle['active'] = False
+          else:
+            bundle['active'] = True
           cfg['bundle']['icon'] = ['icons/icon.ico', 'icons/icon.png']
           Path('tauri.ci.conf.json').write_text(json.dumps(cfg))
           PY
@@ -602,15 +609,21 @@ jobs:
         run: |
           mkdir -p dist
           if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
-            file="workspace/apps/gui/target/${{ matrix.target }}/release/fileuni-gui.exe"
+            file="workspace/target/${{ matrix.target }}/release/fileuni-gui.exe"
             if [ ! -f "${file}" ]; then
-              file="$(find workspace/apps/gui/target/${{ matrix.target }}/release -maxdepth 1 -type f -name '*.exe' | head -1)"
+              file="$(find workspace/target/${{ matrix.target }}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
+            fi
+            if [ -z "${file}" ] || [ ! -f "${file}" ]; then
+              file="$(find workspace/apps/gui/target/${{ matrix.target }}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
             fi
           else
             ext="${{ matrix.artifact_ext }}"
-            file="$(find workspace/apps/gui/target/${{ matrix.target }}/release/bundle -type f -name "*${ext}" | head -1)"
+            file="$(find workspace/target/${{ matrix.target }}/release/bundle -type f -name "*${ext}" 2>/dev/null | head -1 || true)"
+            if [ -z "${file}" ] || [ ! -f "${file}" ]; then
+              file="$(find workspace/apps/gui/target/${{ matrix.target }}/release/bundle -type f -name "*${ext}" 2>/dev/null | head -1 || true)"
+            fi
           fi
-          if [ -z "${file}" ]; then
+          if [ -z "${file}" ] || [ ! -f "${file}" ]; then
             echo "::error::No GUI artifact found for target ${{ matrix.target }}"
             exit 1
           fi
@@ -622,26 +635,43 @@ jobs:
         run: |
           src="$(find dist -maxdepth 1 -type f -name '*.exe' | head -1)"
           if [ -z "${src}" ]; then
-            echo "::warning::No Windows GUI exe found for UPX"
-            exit 0
+            echo "::error::No Windows GUI exe found for UPX"
+            exit 1
           fi
 
-          curl -fsSL -o /tmp/upx.zip https://github.com/upx/upx/releases/download/v5.0.0/upx-5.0.0-win64.zip
-          python3 - <<'PY'
+          downloaded=false
+          for url in \
+            "https://github.com/upx/upx/releases/download/v5.0.0/upx-5.0.0-win64.zip" \
+            "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip"; do
+            if curl -fsSL -o /tmp/upx.zip "${url}"; then
+              downloaded=true
+              break
+            fi
+          done
+          if [ "${downloaded}" != "true" ]; then
+            echo "::error::Failed to download UPX binary"
+            exit 1
+          fi
+
+          if ! python3 - <<'PY'
           import zipfile
           zipfile.ZipFile('/tmp/upx.zip').extractall('/tmp/upx')
           PY
+          then
+            echo "::error::Failed to extract UPX archive"
+            exit 1
+          fi
 
           upx_bin="$(find /tmp/upx -type f -iname 'upx.exe' | head -1)"
           if [ -z "${upx_bin}" ]; then
-            echo "::warning::UPX executable not found"
-            exit 0
+            echo "::error::UPX executable not found"
+            exit 1
           fi
 
           mkdir -p dist-upx
           out="dist-upx/$(basename "${src%.exe}")-upx.exe"
           cp "${src}" "${out}"
-          "$upx_bin" --best --lzma "${out}" || { echo "::warning::UPX compression failed"; rm -f "${out}"; exit 0; }
+          "$upx_bin" --best --lzma "${out}"
 
       - name: Upload GUI Windows UPX artifact
         if: matrix.target == 'x86_64-pc-windows-msvc' && github.event.inputs.enable_upx != 'false'
@@ -649,7 +679,7 @@ jobs:
         with:
           name: gui-${{ matrix.target }}-upx
           path: dist-upx/*
-          if-no-files-found: ignore
+          if-no-files-found: error
 
       - name: Upload GUI artifacts
         uses: actions/upload-artifact@v4
@@ -721,7 +751,12 @@ jobs:
   # ============================================================
   package-linux:
     needs: [resolve-matrix, build-cli, build-cli-cross]
-    if: ${{ always() && !cancelled() && needs.resolve-matrix.outputs.has_nfpm == 'true' }}
+    if: ${{
+      !cancelled() &&
+      needs.resolve-matrix.outputs.has_nfpm == 'true' &&
+      (needs.resolve-matrix.outputs.has_cargo_dist != 'true' || needs.build-cli.result == 'success') &&
+      (needs.resolve-matrix.outputs.has_cross != 'true' || needs.build-cli-cross.result == 'success')
+      }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -760,9 +795,9 @@ jobs:
           ls -la binary/
 
       - name: Install nFPM
-        uses: secondlife/setup-nfpm@v1
+        uses: secondlife/setup-nfpm@v3
         with:
-          version: latest
+          version: 2.45.0
 
       - name: Create nfpm config
         env:
@@ -806,7 +841,7 @@ jobs:
 
   publish:
     needs: [resolve-matrix, build-cli, build-cli-cross, build-cli-android, build-cli-bsd, build-gui, package-linux]
-    if: ${{ always() && !cancelled() }}
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
