@@ -16,6 +16,10 @@ Thank you for your interest in contributing to FileUni!
 
 ## Language Policy
 
+English is the primary language for all communications in this repository.
+
+### Scope
+
 | Context | Language |
 |---------|----------|
 | Code (strings, identifiers) | English |
@@ -25,7 +29,21 @@ Thank you for your interest in contributing to FileUni!
 | Error messages | English |
 | API responses | English |
 | Commit messages | English |
-| Pull request descriptions | English |
+| Issues & PR descriptions | English |
+
+### Why English?
+
+- **Global Accessibility**: Contributors from all regions can collaborate effectively
+- **Consistency**: A single language keeps discussions organized and searchable
+- **Open Source Best Practice**: Most successful open-source projects use English as the lingua franca
+
+### Need Help with English?
+
+If English isn't your first language, don't worry! We value your contributions regardless of perfect grammar. You can:
+
+- Use translation tools to help compose messages
+- Ask for help from other community members
+- Focus on clear, simple communication rather than perfect prose
 
 ---
 

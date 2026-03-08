@@ -5,35 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for taking the time to report a bug. Your feedback helps us make FileUni better.
-        
-        ---
-        
-        **Please use English when describing the issue.** Imperfect grammar or machine-translated English is perfectly fine - we just want to understand your problem!
-        
-        ---
-        
-        请使用英语描述问题。语法不完美或机器翻译的英语完全可以接受 - 我们只想理解您的问题！
-        
-        Bitte beschreiben Sie das Problem auf Englisch. Unvollkommene Grammatik oder maschinell übersetztes Englisch ist völlig akzeptabel - wir möchten Ihr Problem verstehen!
-        
-        Veuillez décrire le problème en anglais. Une grammaire imparfaite ou un anglais traduit par machine est tout à fait acceptable - nous voulons juste comprendre votre problème!
-        
-        Si prega di descrivere il problema in inglese. Una grammatica imperfetta o un inglese tradotto automaticamente è perfettamente accettabile - vogliamo solo capire il vostro problema!
-        
-        英語で問題を説明してください。文法が不完全でも、機械翻訳でも構いません - 問題を理解したいだけです！
-        
-        문제를 영어로 설명해 주세요. 문법이 완벽하지 않거나 기계 번역된 영어도 완전히 괜찮습니다 - 우리는 단지 문제를 이해하고 싶을 뿐입니다!
-        
-        Por favor, describa el problema en inglés. La gramática imperfecta o el inglés traducido por máquina es perfectamente aceptable - ¡solo queremos entender su problema!
-        
-        Por favor, descreva o problema em inglês. Gramática imperfeita ou inglês traduzido por máquina é perfeitamente aceitável - só queremos entender o seu problema!
-        
-        يرجى وصف المشكلة باللغة الإنجليزية. القواعد غير المثالية أو الإنجليزية المترجمة آليًا مقبولة تمامًا - نريد فقط فهم مشكلتك!
-        
-        Пожалуйста, опишите проблему на английском. Несовершенная грамматика или машинный перевод вполне допустимы - мы просто хотим понять вашу проблему!
-        
-        Lütfen sorunu İngilizce olarak açıklayın. Kusurlu dilbilgisi veya makine çevirisi İngilizce tamamen kabul edilebilir - sadece sorununuzu anlamak istiyoruz!
+        Thank you for reporting a bug! Please describe the issue in English (imperfect grammar or machine translation is fine). See our [Language Policy](https://github.com/FileUni/FileUni-Project/blob/main/CONTRIBUTING.md#language-policy).
 
   - type: checkboxes
     id: pre-check
@@ -47,8 +19,6 @@ body:
     id: description
     attributes:
       label: Bug Description
-      description: A clear and concise description of what the bug is
-      placeholder: "When I try to upload a file larger than 100MB, the upload fails..."
     validations:
       required: true
 
@@ -56,11 +26,10 @@ body:
     id: steps
     attributes:
       label: Steps to Reproduce
-      description: How can we reproduce this behavior?
       placeholder: |
-        1. Go to '...'
-        2. Click on '...'
-        3. Observe error
+        1. 
+        2. 
+        3. 
     validations:
       required: true
 
@@ -68,7 +37,6 @@ body:
     id: expected
     attributes:
       label: Expected Behavior
-      description: What did you expect to happen?
     validations:
       required: true
 
@@ -77,15 +45,14 @@ body:
     attributes:
       label: Environment
       placeholder: |
-        - FileUni Version: 
-        - OS: 
-        - Browser/Deployment: 
+        - FileUni Version:
+        - OS:
+        - Browser/Deployment:
     validations:
       required: true
 
   - type: textarea
     id: logs
     attributes:
-      label: Relevant Logs
-      description: Paste any relevant log output (remove sensitive info)
+      label: Relevant Logs (optional)
       render: shell
