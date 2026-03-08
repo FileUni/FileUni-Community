@@ -1378,7 +1378,9 @@ jobs:
           # Force generated Xcode project to unsigned mode.
           project_pbxproj="gen/apple/fileuni-gui.xcodeproj/project.pbxproj"
           if [ -f "${project_pbxproj}" ]; then
+            escaped_toolchain="$(printf '%s\n' "${default_toolchain}" | sed 's/[\\/&]/\\&/g')"
             perl -0777 -i -pe 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g; s/CODE_SIGN_STYLE = [^;]*;/CODE_SIGN_STYLE = Manual;/g; s/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "";/g; s/PROVISIONING_PROFILE_SPECIFIER = [^;]*;/PROVISIONING_PROFILE_SPECIFIER = "";/g; s/PROVISIONING_PROFILE = [^;]*;/PROVISIONING_PROFILE = "";/g;' "${project_pbxproj}"
+            perl -0777 -i -pe "s/\\$\\(TOOLCHAIN_DIR\\)\\/usr\\/lib\\/swift\\//${escaped_toolchain}\\/usr\\/lib\\/swift\\//g; s/\\$\\(TOOLCHAIN_DIR\\)\\/usr\\/lib\\/swift-5\\.0\\//${escaped_toolchain}\\/usr\\/lib\\/swift-5.0\\//g;" "${project_pbxproj}"
           fi
 
           tauri_target="${{ matrix.target }}"
