@@ -7,7 +7,7 @@ body:
       value: |
         Thank you for your suggestion! This form is for **improvements to existing features only**. For new feature ideas, please use [Discussions](https://github.com/FileUni/FileUni-Project/discussions).
         
-        Please describe in English (imperfect grammar or machine translation is fine). See our [Language Policy](https://github.com/FileUni/FileUni-Project/blob/main/CONTRIBUTING.md#language-policy).
+        Please describe in English (imperfect grammar or machine translation is fine). See our [Language Policy](https://github.com/FileUni/FileUni-Project/blob/main/CONTRIBUTING.md#language-policy) and [Why English](https://github.com/FileUni/FileUni-Project/blob/main/CONTRIBUTING.md#why-english).
 
   - type: checkboxes
     id: pre-check
