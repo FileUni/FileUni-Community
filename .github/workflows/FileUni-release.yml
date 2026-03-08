@@ -199,6 +199,9 @@ jobs:
           path: workspace
           submodules: true
 
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
@@ -239,6 +242,9 @@ jobs:
           token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
           path: workspace
           submodules: true
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
