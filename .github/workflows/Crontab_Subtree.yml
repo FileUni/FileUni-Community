@@ -39,7 +39,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ steps.resolve-ref.outputs.ref }}
-          token: ${{ secrets.FILEUNI_PROJECT_TRIGGER_TOKEN }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
           path: workspace
           fetch-depth: 0
           submodules: true
