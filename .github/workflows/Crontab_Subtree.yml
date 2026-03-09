@@ -82,5 +82,6 @@ jobs:
 
           push_subtree "FileUni-Project" "FileUni/FileUni-Project"
           push_subtree "OfficialSiteDocs" "FileUni/OfficialSiteDocs"
+          push_subtree "frontends" "FileUni/frontends"
           push_subtree "OfficialSitePrivate" "FileUni/OfficialSitePrivate"
           push_subtree "crates/yh-filemanager-vfs-storage-hub" "FileUni/yh-filemanager-vfs-storage-hub"
