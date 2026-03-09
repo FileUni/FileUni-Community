@@ -1603,7 +1603,11 @@ jobs:
             find /tmp/ct-binary -maxdepth 4 -type f | sort
             exit 1
           fi
-          install -Dm0755 "${binary}" /tmp/ct-binary/fileuni
+          if [ "${binary}" != "/tmp/ct-binary/fileuni" ]; then
+            install -Dm0755 "${binary}" /tmp/ct-binary/fileuni
+          else
+            chmod 0755 /tmp/ct-binary/fileuni
+          fi
 
       - name: Install CT template dependencies
         shell: bash
