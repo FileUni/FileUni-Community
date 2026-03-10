@@ -4,6 +4,8 @@
 
 # FileUni Project
 
+> ⚠️ Lưu ý: Dự án này vẫn đang ở giai đoạn đầu. Nó có thể chưa ổn định và hiện chỉ dành cho mục đích thử nghiệm và giáo dục.
+
 **FileUni** là nền tảng lưu trữ và quản lý tệp thế hệ mới được xây dựng bằng Rust, tập trung vào hiệu năng, bảo mật và triển khai theo mô-đun.
 
 Từ thiết bị siêu nhẹ đến máy chủ đầy đủ, FileUni cung cấp khả năng kiểu NAS mà không cần phần cứng chuyên dụng, đồng thời duy trì một codebase thống nhất có thể mở rộng cho CLI, GUI và các thành phần web.
