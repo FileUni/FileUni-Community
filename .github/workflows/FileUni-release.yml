@@ -49,6 +49,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: release-${{ github.run_id }}
@@ -85,6 +86,8 @@ jobs:
       has_gui_tauri: ${{ steps.matrix.outputs.has_gui_tauri }}
       has_gui_android: ${{ steps.matrix.outputs.has_gui_android }}
       has_gui_ios: ${{ steps.matrix.outputs.has_gui_ios }}
+      npm_platforms: ${{ steps.matrix.outputs.npm_platforms }}
+      has_npm: ${{ steps.matrix.outputs.has_npm }}
     steps:
       - name: Resolve workspace ref
         id: resolve-ref
@@ -201,10 +204,20 @@ jobs:
           echo "cli_nfpm=${cli_nfpm}" >> "$GITHUB_OUTPUT"
           echo "gui_tauri=${gui_tauri}" >> "$GITHUB_OUTPUT"
           echo "gui_android=${gui_android}" >> "$GITHUB_OUTPUT"
+          if [ "${mode}" = "full" ] && [ "${has_cli}" = "true" ]; then
+            npm_platforms="$(jq -c '.platforms' .github/npm/npm-packages.json)"
+            has_npm=true
+          else
+            npm_platforms='[]'
+            has_npm=false
+          fi
+
           echo "gui_ios=${gui_ios}" >> "$GITHUB_OUTPUT"
+          echo "npm_platforms=${npm_platforms}" >> "$GITHUB_OUTPUT"
           echo "build_mode=${mode}" >> "$GITHUB_OUTPUT"
           echo "has_cli=${has_cli}" >> "$GITHUB_OUTPUT"
           echo "has_gui=${has_gui}" >> "$GITHUB_OUTPUT"
+          echo "has_npm=${has_npm}" >> "$GITHUB_OUTPUT"
 
           # has_* flags for conditional job execution
           echo "has_cargo_dist=$([ "$(echo "$cli_cargo_dist" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
@@ -1597,6 +1610,121 @@ jobs:
           push: true
           tags: ${{ steps.docker-tags.outputs.debian }}
 
+  package-npm-platforms:
+    needs: [resolve-matrix, build-cli, build-cli-cross, build-cli-android, build-cli-bsd]
+    if: ${{
+      !cancelled() &&
+      needs.resolve-matrix.outputs.has_npm == 'true' &&
+      (needs.resolve-matrix.outputs.has_cargo_dist != 'true' || needs.build-cli.result == 'success') &&
+      (needs.resolve-matrix.outputs.has_cross != 'true' || needs.build-cli-cross.result == 'success') &&
+      (needs.resolve-matrix.outputs.has_android != 'true' || needs.build-cli-android.result == 'success') &&
+      (needs.resolve-matrix.outputs.has_vmactions != 'true' || needs.build-cli-bsd.result == 'success')
+      }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.npm_platforms) }}
+    steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
+      - name: Download CLI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: /tmp/npm-artifact
+
+      - name: Build npm platform package
+        shell: bash
+        env:
+          PKG_VERSION: ${{ needs.resolve-matrix.outputs.pkg_version }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/build_npm_packages.py \
+            platform \
+            --manifest .github/npm/npm-packages.json \
+            --target "${{ matrix.target }}" \
+            --artifact /tmp/npm-artifact \
+            --version "${PKG_VERSION}" \
+            --output /tmp/npm-packages \
+            --license LICENSE \
+            --template .github/npm/README.platform.md
+          find /tmp/npm-packages -maxdepth 3 -type f | sort
+
+      - name: Upload npm platform package
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package-${{ matrix.target }}
+          path: /tmp/npm-packages/*
+          if-no-files-found: error
+
+  publish-npm:
+    needs: [resolve-matrix, package-npm-platforms]
+    if: ${{
+      !cancelled() &&
+      needs.resolve-matrix.outputs.has_npm == 'true' &&
+      needs.package-npm-platforms.result == 'success'
+      }}
+    runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
+      - name: Warn when npm token is missing
+        if: env.NODE_AUTH_TOKEN == ''
+        run: echo "::warning::NPM_TOKEN is empty, skipping npm publish."
+
+      - name: Setup Node.js
+        if: env.NODE_AUTH_TOKEN != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download npm platform packages
+        if: env.NODE_AUTH_TOKEN != ''
+        uses: actions/download-artifact@v4
+        with:
+          pattern: npm-package-*
+          path: /tmp/npm-publish/platforms
+          merge-multiple: true
+
+      - name: Publish platform packages to npm
+        if: env.NODE_AUTH_TOKEN != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          find /tmp/npm-publish/platforms -mindepth 1 -maxdepth 1 -type d | sort | while read -r pkg_dir; do
+            echo "Publishing $(basename "${pkg_dir}")"
+            npm publish "${pkg_dir}" --access public --provenance
+          done
+
+      - name: Build npm root package
+        if: env.NODE_AUTH_TOKEN != ''
+        shell: bash
+        env:
+          PKG_VERSION: ${{ needs.resolve-matrix.outputs.pkg_version }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/build_npm_packages.py \
+            root \
+            --manifest .github/npm/npm-packages.json \
+            --version "${PKG_VERSION}" \
+            --output /tmp/npm-root \
+            --license LICENSE \
+            --template .github/npm/README.root.md
+          find /tmp/npm-root -maxdepth 3 -type f | sort
+
+      - name: Publish root package to npm
+        if: env.NODE_AUTH_TOKEN != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm publish /tmp/npm-root/fileuni --access public --provenance
+
   build-pve-ct-template:
     needs: [resolve-matrix, build-cli]
     if: ${{
@@ -1680,6 +1808,8 @@ jobs:
         build-gui-ios,
         package-linux,
         publish-docker,
+        package-npm-platforms,
+        publish-npm,
         build-pve-ct-template,
       ]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}

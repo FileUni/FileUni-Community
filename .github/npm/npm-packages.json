@@ -1,0 +1,181 @@
+{
+  "root_package": {
+    "name": "fileuni",
+    "description": "FileUni CLI distributed through npm with platform-specific native binaries.",
+    "repository_directory": ".github/npm"
+  },
+  "platforms": [
+    {
+      "target": "x86_64-unknown-linux-gnu",
+      "artifact": "cli-x86_64-unknown-linux-gnu",
+      "package_name": "@fileuni/fileuni-linux-x64-gnu",
+      "os": "linux",
+      "cpu": "x64",
+      "libc": "glibc",
+      "variant": "gnu",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "x86_64-unknown-linux-musl",
+      "artifact": "cli-x86_64-unknown-linux-musl",
+      "package_name": "@fileuni/fileuni-linux-x64-musl",
+      "os": "linux",
+      "cpu": "x64",
+      "libc": "musl",
+      "variant": "musl",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "aarch64-unknown-linux-gnu",
+      "artifact": "cli-aarch64-unknown-linux-gnu",
+      "package_name": "@fileuni/fileuni-linux-arm64-gnu",
+      "os": "linux",
+      "cpu": "arm64",
+      "libc": "glibc",
+      "variant": "gnu",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "aarch64-unknown-linux-musl",
+      "artifact": "cli-aarch64-unknown-linux-musl",
+      "package_name": "@fileuni/fileuni-linux-arm64-musl",
+      "os": "linux",
+      "cpu": "arm64",
+      "libc": "musl",
+      "variant": "musl",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "i686-unknown-linux-gnu",
+      "artifact": "cli-i686-unknown-linux-gnu",
+      "package_name": "@fileuni/fileuni-linux-ia32-gnu",
+      "os": "linux",
+      "cpu": "ia32",
+      "libc": "glibc",
+      "variant": "gnu",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "i686-unknown-linux-musl",
+      "artifact": "cli-i686-unknown-linux-musl",
+      "package_name": "@fileuni/fileuni-linux-ia32-musl",
+      "os": "linux",
+      "cpu": "ia32",
+      "libc": "musl",
+      "variant": "musl",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "arm-unknown-linux-gnueabi",
+      "artifact": "cli-arm-unknown-linux-gnueabi",
+      "package_name": "@fileuni/fileuni-linux-arm-gnu",
+      "os": "linux",
+      "cpu": "arm",
+      "libc": "glibc",
+      "variant": "gnu",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "armv7-unknown-linux-musleabihf",
+      "artifact": "cli-armv7-unknown-linux-musleabihf",
+      "package_name": "@fileuni/fileuni-linux-arm-musl",
+      "os": "linux",
+      "cpu": "arm",
+      "libc": "musl",
+      "variant": "musl",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "riscv64gc-unknown-linux-gnu",
+      "artifact": "cli-riscv64gc-unknown-linux-gnu",
+      "package_name": "@fileuni/fileuni-linux-riscv64-gnu",
+      "os": "linux",
+      "cpu": "riscv64",
+      "libc": "glibc",
+      "variant": "gnu",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "powerpc64le-unknown-linux-gnu",
+      "artifact": "cli-powerpc64le-unknown-linux-gnu",
+      "package_name": "@fileuni/fileuni-linux-ppc64le-gnu",
+      "os": "linux",
+      "cpu": "ppc64",
+      "libc": "glibc",
+      "variant": "gnu",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "x86_64-pc-windows-msvc",
+      "artifact": "cli-x86_64-pc-windows-msvc",
+      "package_name": "@fileuni/fileuni-win32-x64-msvc",
+      "os": "win32",
+      "cpu": "x64",
+      "variant": "msvc",
+      "binary_name": "fileuni.exe"
+    },
+    {
+      "target": "i686-pc-windows-msvc",
+      "artifact": "cli-i686-pc-windows-msvc",
+      "package_name": "@fileuni/fileuni-win32-ia32-msvc",
+      "os": "win32",
+      "cpu": "ia32",
+      "variant": "msvc",
+      "binary_name": "fileuni.exe"
+    },
+    {
+      "target": "x86_64-apple-darwin",
+      "artifact": "cli-x86_64-apple-darwin",
+      "package_name": "@fileuni/fileuni-darwin-x64",
+      "os": "darwin",
+      "cpu": "x64",
+      "variant": "darwin",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "aarch64-apple-darwin",
+      "artifact": "cli-aarch64-apple-darwin",
+      "package_name": "@fileuni/fileuni-darwin-arm64",
+      "os": "darwin",
+      "cpu": "arm64",
+      "variant": "darwin",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "aarch64-linux-android",
+      "artifact": "cli-aarch64-linux-android",
+      "package_name": "@fileuni/fileuni-android-arm64",
+      "os": "android",
+      "cpu": "arm64",
+      "variant": "android",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "armv7-linux-androideabi",
+      "artifact": "cli-armv7-linux-androideabi",
+      "package_name": "@fileuni/fileuni-android-arm",
+      "os": "android",
+      "cpu": "arm",
+      "variant": "android",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "x86_64-linux-android",
+      "artifact": "cli-x86_64-linux-android",
+      "package_name": "@fileuni/fileuni-android-x64",
+      "os": "android",
+      "cpu": "x64",
+      "variant": "android",
+      "binary_name": "fileuni"
+    },
+    {
+      "target": "x86_64-unknown-freebsd",
+      "artifact": "cli-x86_64-unknown-freebsd",
+      "package_name": "@fileuni/fileuni-freebsd-x64",
+      "os": "freebsd",
+      "cpu": "x64",
+      "variant": "freebsd",
+      "binary_name": "fileuni"
+    }
+  ]
+}
