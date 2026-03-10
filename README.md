@@ -4,6 +4,8 @@
 
 # FileUni Project
 
+> ⚠️ Notice: This project is in its early stages. It may be unstable and is currently intended for testing and educational use only.
+
 **FileUni** is a next-generation storage and file management platform built with Rust for performance, security, and modular deployment.
 
 From ultra-light devices to full servers, FileUni is designed to provide NAS-style capabilities without requiring dedicated hardware, while keeping one scalable codebase across CLI, GUI, and web-facing components.
