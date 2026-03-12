@@ -715,7 +715,10 @@ jobs:
       - name: Install Android build-tools (zipalign/apksigner)
         shell: bash
         run: |
-          yes | sdkmanager "build-tools;34.0.0" > /dev/null
+          sdkmanager "build-tools;34.0.0"
+          set +o pipefail
+          yes | sdkmanager --licenses > /dev/null
+          set -o pipefail
 
       - name: Install cargo-ndk
         uses: taiki-e/install-action@v2
