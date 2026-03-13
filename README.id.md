@@ -4,6 +4,13 @@
 
 # FileUni Project
 
+<p align="center">
+  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Website-fileuni.com-blue?style=for-the-badge" alt="Website"></a>
+  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/Dokumentasi-docs.fileuni.com-green?style=for-the-badge" alt="Dokumentasi"></a>
+  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>
+  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a>
+</p>
+
 > ⚠️ Pemberitahuan: Proyek ini masih dalam tahap awal. Proyek ini mungkin belum stabil dan saat ini hanya ditujukan untuk pengujian serta penggunaan edukasi.
 
 **FileUni** adalah platform penyimpanan dan manajemen file generasi berikutnya yang dibangun dengan Rust untuk performa, keamanan, dan deployment modular.

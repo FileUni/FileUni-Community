@@ -4,6 +4,13 @@
 
 # FileUni Project
 
+<p align="center">
+  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Website-fileuni.com-blue?style=for-the-badge" alt="Website"></a>
+  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/Tài_liệu-docs.fileuni.com-green?style=for-the-badge" alt="Tài liệu"></a>
+  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>
+  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a>
+</p>
+
 > ⚠️ Lưu ý: Dự án này vẫn đang ở giai đoạn đầu. Nó có thể chưa ổn định và hiện chỉ dành cho mục đích thử nghiệm và giáo dục.
 
 **FileUni** là nền tảng lưu trữ và quản lý tệp thế hệ mới được xây dựng bằng Rust, tập trung vào hiệu năng, bảo mật và triển khai theo mô-đun.

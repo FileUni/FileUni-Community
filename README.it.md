@@ -4,6 +4,13 @@
 
 # FileUni Project
 
+<p align="center">
+  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Sito_Web-fileuni.com-blue?style=for-the-badge" alt="Sito Web"></a>
+  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/Documentazione-docs.fileuni.com-green?style=for-the-badge" alt="Documentazione"></a>
+  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>
+  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a>
+</p>
+
 > ⚠️ Avviso: Questo progetto è ancora nelle fasi iniziali. Potrebbe essere instabile ed è attualmente destinato solo a test e uso educativo.
 
 **FileUni** è una piattaforma di nuova generazione per storage e gestione dei file, sviluppata in Rust per prestazioni, sicurezza e distribuzione modulare.
