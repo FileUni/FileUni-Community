@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://fileuni.com"><img src="https://img.shields.io/badge/官网-fileuni.com-blue?style=for-the-badge" alt="官网"></a>
-  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/文档站-docs.fileuni.com-green?style=for-the-badge" alt="文档站"></a>
+  <a href="https://docs.fileuni.com/zh-cn/"><img src="https://img.shields.io/badge/文档站-docs.fileuni.com-green?style=for-the-badge" alt="文档站"></a>
   <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>
   <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a>
 </p>
