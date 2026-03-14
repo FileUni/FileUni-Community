@@ -52,8 +52,10 @@ permissions:
   id-token: write
 
 concurrency:
-  group: release-${{ github.run_id }}
-  cancel-in-progress: false
+  # De-dupe accidental double-dispatch for the same workspace ref.
+  # This can happen when a release commit and tags are pushed together.
+  group: release-${{ github.event.inputs.workspace_ref }}-${{ github.event.inputs.build_mode }}-${{ github.event.inputs.build_target }}-${{ github.event.inputs.trigger_mode }}
+  cancel-in-progress: true
 
 env:
   WORKSPACE_REPO: FileUni/FileUni-WorkSpace
