@@ -82,23 +82,17 @@ jobs:
 
             echo "::group::subtree push ${prefix} -> ${repo}"
 
-            if [ "${force_push}" = "true" ]; then
+            split_sha="$(git subtree split --prefix="${prefix}" --ignore-joins)"
+            remote_main_sha="$(git ls-remote "${remote_url}" refs/heads/main | cut -f1)"
+
+            if [ -z "${remote_main_sha}" ]; then
+              git push "${remote_url}" "${split_sha}:refs/heads/main"
+            elif [ "${force_push}" = "true" ]; then
               echo "::warning::force_push enabled; rewriting ${repo}:main to match workspace"
-
-              split_sha="$(git subtree split --prefix="${prefix}" --ignore-joins)"
-              remote_main_sha="$(git ls-remote "${remote_url}" refs/heads/main | cut -f1)"
-
-              if [ -z "${remote_main_sha}" ]; then
-                git push "${remote_url}" "${split_sha}:refs/heads/main"
-              else
-                git push "${remote_url}" "${split_sha}:refs/heads/main" \
-                  --force-with-lease=refs/heads/main:"${remote_main_sha}"
-              fi
+              git push "${remote_url}" "${split_sha}:refs/heads/main" \
+                --force-with-lease=refs/heads/main:"${remote_main_sha}"
             else
-              git subtree push \
-                --prefix="${prefix}" \
-                "${remote_url}" \
-                main
+              git push "${remote_url}" "${split_sha}:refs/heads/main"
             fi
             echo "::endgroup::"
           }
