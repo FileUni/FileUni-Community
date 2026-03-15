@@ -85,7 +85,7 @@ jobs:
             if [ "${force_push}" = "true" ]; then
               echo "::warning::force_push enabled; rewriting ${repo}:main to match workspace"
 
-              split_sha="$(git subtree split --prefix="${prefix}")"
+              split_sha="$(git subtree split --prefix="${prefix}" --ignore-joins)"
               remote_main_sha="$(git ls-remote "${remote_url}" refs/heads/main | cut -f1)"
 
               if [ -z "${remote_main_sha}" ]; then
