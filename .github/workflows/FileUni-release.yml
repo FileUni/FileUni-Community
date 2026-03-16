@@ -1083,67 +1083,23 @@ jobs:
         run: |
           python3 - <<'PY'
           import json
-          import re
+          import os
           from pathlib import Path
 
           version = "${{ needs.resolve-matrix.outputs.pkg_version }}"
 
-          semver_re = re.compile(
-              r"^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$"
-          )
-
-          def compute_android_version_code(raw_version: str) -> int:
-              m = semver_re.match(raw_version)
-              if not m:
-                  raise SystemExit(f"Invalid semver for Android versionCode: {raw_version}")
-
-              major = int(m.group(1))
-              minor = int(m.group(2))
-              patch = int(m.group(3))
-              prerelease = m.group(4) or ""
-
-              # Deterministic versionCode scheme (fits Play Store limit 2,100,000,000):
-              # - major: 0..20
-              # - minor: 0..99
-              # - patch: 0..999
-              # - stage: 0..999 (stable=999, prerelease < 999)
-              if major > 20:
-                  raise SystemExit(
-                      f"Android versionCode scheme overflow: major={major} (max 20). Update the scheme."
-                  )
-              if minor > 99:
-                  raise SystemExit(
-                      f"Android versionCode scheme overflow: minor={minor} (max 99). Update the scheme."
-                  )
-              if patch > 999:
-                  raise SystemExit(
-                      f"Android versionCode scheme overflow: patch={patch} (max 999). Update the scheme."
-                  )
-
-              if not prerelease:
-                  stage = 999
-              else:
-                  first_id = prerelease.split(".", 1)[0].lower()
-                  nums = [int(v) for v in re.findall(r"\d+", prerelease)]
-                  a = nums[0] if len(nums) > 0 else 0
-                  b = nums[1] if len(nums) > 1 else 0
-
-                  if first_id.startswith("rc"):
-                      seq = (a * 10 + b) if len(nums) > 1 else a
-                      stage = 900 + min(seq, 98)
-                  elif first_id.startswith("beta"):
-                      seq = (a * 10 + b) if len(nums) > 1 else a
-                      stage = 800 + min(seq, 99)
-                  else:
-                      # Treat all other prerelease labels as alpha-like builds.
-                      # Examples:
-                      # - alpha4.11 -> 411
-                      # - alpha4 -> 400
-                      stage = min(a * 100 + b, 799)
-
-              return major * 100_000_000 + minor * 1_000_000 + patch * 1_000 + stage
-
-          version_code = compute_android_version_code(version)
+          # Deterministic + monotonically increasing Android versionCode.
+          # Use workflow run number so Android upgrades never get blocked by semver shape.
+          run_number_raw = os.environ.get("GITHUB_RUN_NUMBER", "")
+          if not run_number_raw.isdigit():
+              raise SystemExit(f"Missing/invalid GITHUB_RUN_NUMBER: {run_number_raw!r}")
+          run_number = int(run_number_raw)
+          base = 1_000_000_000
+          version_code = base + run_number
+          if version_code > 2_100_000_000:
+              raise SystemExit(
+                  f"Android versionCode overflow: {version_code} (base={base} run_number={run_number})"
+              )
 
           p = Path("tauri.conf.json")
           cfg = json.loads(p.read_text(encoding="utf-8"))
@@ -1158,7 +1114,7 @@ jobs:
               android_bundle = bundle.setdefault("android", {})
               android_bundle["versionCode"] = version_code
               android_p.write_text(json.dumps(android_cfg, indent=2) + "\n", encoding="utf-8")
-              print(f"tauri.android.conf.json versionCode -> {version_code}")
+              print(f"tauri.android.conf.json versionCode -> {version_code} (GITHUB_RUN_NUMBER={run_number})")
           PY
 
       - name: Initialize Android project if missing
