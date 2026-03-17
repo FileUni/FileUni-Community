@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thank you for your suggestion!
-        Please describe in English (machine translation is OK).
+        Please describe in English (machine translation is OK). [Why English?](https://github.com/FileUni/FileUni-Project/blob/main/CONTRIBUTING.md#language-policy)
 
   - type: checkboxes
     id: pre-check
