@@ -2044,7 +2044,53 @@ jobs:
 
           current_ref="${WORKSPACE_REF}"
           current_sha="$(git rev-parse "${current_ref}")"
-          prev_tag="$(git describe --tags --abbrev=0 "${current_sha}^" 2>/dev/null || true)"
+
+          # We want release notes to be based on the last *stable* (non-pre) version tag,
+          # not just the nearest previous tag (which might be a prerelease tag).
+          # A stable tag is:
+          # - a version tag like v1.2.3 / fileuni-v1.2.3
+          # - NOT containing prerelease markers like alpha/beta/rc/test/... (case-insensitive)
+          is_prerelease_tag() {
+            local t
+            t="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+            # Match typical patterns like: -alpha.1, -beta1, -rc.2, _test, nightly_...
+            printf '%s' "${t}" | grep -Eiq '(^|[^a-z0-9])(alpha|beta|rc|test|demo|temp|tmp|nightly|manually)([^a-z0-9]|[0-9]|$)'
+          }
+
+          is_version_tag() {
+            local t
+            t="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')"
+            [[ "${t}" =~ ^(fileuni-)?v[0-9] ]]
+          }
+
+          exclude_tag=""
+          if git show-ref --tags --verify --quiet "refs/tags/${current_ref}"; then
+            exclude_tag="${current_ref}"
+          fi
+
+          prev_stable_tag=""
+          while IFS= read -r t; do
+            [ -n "${t}" ] || continue
+            if [ -n "${exclude_tag}" ] && [ "${t}" = "${exclude_tag}" ]; then
+              continue
+            fi
+            if ! is_version_tag "${t}"; then
+              continue
+            fi
+            if is_prerelease_tag "${t}"; then
+              continue
+            fi
+            prev_stable_tag="${t}"
+            break
+          done < <(git for-each-ref --merged "${current_sha}" --sort=-creatordate --format '%(refname:short)' refs/tags)
+
+          prev_tag="${prev_stable_tag}"
+          if [ -z "${prev_tag}" ]; then
+            # Fallback: keep historical behavior if no stable version tag exists.
+            prev_tag="$(git describe --tags --abbrev=0 "${current_sha}^" 2>/dev/null || true)"
+          fi
+
+          echo "::notice::Release notes start tag=${prev_tag:-<none>}  ref=${current_ref}  sha=${current_sha}"
 
           notes_file="/tmp/release-notes.md"
           {
