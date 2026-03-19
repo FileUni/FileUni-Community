@@ -138,7 +138,7 @@ cargo fmt --check
 
 Frontend:
 ```bash
-cd frontends/ui && bun run check
+cd frontends && bun run check
 ```
 
 ---
