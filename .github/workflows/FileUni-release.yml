@@ -882,11 +882,38 @@ jobs:
               if [ -z "${app_bundle}" ] || [ ! -d "${app_bundle}" ]; then
                 app_bundle="$(find workspace/apps/gui/target/${target}/release/bundle -maxdepth 2 -type d -name '*.app' 2>/dev/null | head -1 || true)"
               fi
+
+              mount_point=""
+              mounted=false
+              cleanup_mount() {
+                if [ "${mounted}" = "true" ] && [ -n "${mount_point}" ]; then
+                  hdiutil detach "${mount_point}" -quiet || true
+                fi
+                if [ -n "${mount_point}" ]; then
+                  rm -rf "${mount_point}"
+                fi
+              }
+              trap cleanup_mount EXIT
+
+              if [ -z "${app_bundle}" ] || [ ! -d "${app_bundle}" ]; then
+                if [[ "${file}" == *.dmg ]]; then
+                  mount_point="${RUNNER_TEMP:-/tmp}/fileuni-dmg-${target}"
+                  rm -rf "${mount_point}"
+                  mkdir -p "${mount_point}"
+                  hdiutil attach "${file}" -nobrowse -readonly -mountpoint "${mount_point}" >/dev/null
+                  mounted=true
+                  app_bundle="$(find "${mount_point}" -maxdepth 1 -type d -name '*.app' 2>/dev/null | head -1 || true)"
+                fi
+              fi
+
               if [ -z "${app_bundle}" ] || [ ! -d "${app_bundle}" ]; then
                 echo "::error::No macOS .app bundle found for target ${target}"
                 exit 1
               fi
+
               ditto -c -k --sequesterRsrc --keepParent "${app_bundle}" "dist/${app_base}.zip"
+              cleanup_mount
+              trap - EXIT
             fi
           fi
 
@@ -1578,6 +1605,26 @@ jobs:
             fi
             mv "${p}" "packages/${base}.${ext}"
           done
+
+          ls -la packages/
+
+      - name: Build OpenWrt LuCI package
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        env:
+          OPENWRT_PACKAGE_ARCH: all
+          VERSION: ${{ needs.resolve-matrix.outputs.publish_version }}
+        run: |
+          set -euo pipefail
+
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          luci_base="$(fileuni_luci_base)"
+
+          bash .github/scripts/build-openwrt-luci-package.sh \
+            "${{ github.workspace }}" \
+            "./packages" \
+            "${VERSION}" \
+            "${OPENWRT_PACKAGE_ARCH}" \
+            "${luci_base}"
 
           ls -la packages/
 

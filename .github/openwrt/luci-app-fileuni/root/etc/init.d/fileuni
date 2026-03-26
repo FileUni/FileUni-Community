@@ -1,0 +1,49 @@
+#!/bin/sh /etc/rc.common
+
+USE_PROCD=1
+START=99
+STOP=10
+
+PROG="/usr/bin/fileuni"
+SERVICE_NAME="fileuni"
+
+ensure_dir() {
+	local path="$1"
+	[ -n "$path" ] || return 1
+	mkdir -p "$path" || return 1
+	return 0
+}
+
+load_service_config() {
+	config_load "$SERVICE_NAME"
+	config_get_bool enabled main enabled 0
+	config_get config_dir main config_dir "/etc/fileuni"
+	config_get app_data_dir main app_data_dir "/var/lib/fileuni"
+	config_get work_dir main work_dir "/var/lib/fileuni"
+}
+
+service_triggers() {
+	procd_add_reload_trigger "$SERVICE_NAME"
+}
+
+start_service() {
+	load_service_config
+	[ "$enabled" -eq 1 ] || return 0
+	[ -x "$PROG" ] || return 1
+
+	ensure_dir "$config_dir" || return 1
+	ensure_dir "$app_data_dir" || return 1
+	ensure_dir "$work_dir" || return 1
+
+	procd_open_instance
+	procd_set_param command "$PROG" --config-date "$config_dir" --AppDataDir "$app_data_dir"
+	procd_set_param cwd "$work_dir"
+	procd_set_param respawn 3600 5 5
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}
+
+stop_service() {
+	return 0
+}

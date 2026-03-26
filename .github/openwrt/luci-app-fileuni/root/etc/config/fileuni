@@ -1,0 +1,5 @@
+config main 'main'
+	option enabled '0'
+	option config_dir '/etc/fileuni'
+	option app_data_dir '/var/lib/fileuni'
+	option work_dir '/var/lib/fileuni'

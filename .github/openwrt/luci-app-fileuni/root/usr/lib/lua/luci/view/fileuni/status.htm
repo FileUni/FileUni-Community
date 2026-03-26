@@ -1,0 +1,61 @@
+<%
+local json = require "luci.jsonc"
+local backend = self.fileuni_backend or {}
+local host = backend.host or ""
+local port = backend.port or "19000"
+local config_path = backend.config_path or "/etc/fileuni/config.toml"
+local status_text = backend.status_text or "Unknown"
+local binary_text = backend.binary_text or "Unknown"
+local backend_hint = backend.backend_hint or ("http://<router-ip>:" .. port .. "/ui")
+local admin_reset_hint = backend.admin_reset_hint or ""
+local has_config = backend.has_config
+%>
+
+<script type="text/javascript">
+	(function() {
+		var host = <%= json.stringify(host) %>;
+		var port = <%= json.stringify(port) %>;
+
+		window.fileuniOpenBackend = function() {
+			var normalized = (host || "").toLowerCase();
+			var targetHost = host;
+
+			if (!targetHost || normalized === "0.0.0.0" || normalized === "::" || normalized === "127.0.0.1" || normalized === "localhost") {
+				targetHost = window.location.hostname;
+			}
+
+			window.open("http://" + targetHost + ":" + port + "/ui", "_blank", "noopener");
+		};
+	})();
+</script>
+
+<div class="cbi-section">
+	<h3><%:Backend Access%></h3>
+	<div class="table">
+		<div class="tr">
+			<div class="td left" width="33%"><%:Service status%></div>
+			<div class="td left"><%= pcdata(status_text) %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%:CLI binary%></div>
+			<div class="td left"><%= pcdata(binary_text) %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%:Config file%></div>
+			<div class="td left"><%= pcdata(config_path) %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%:Detected backend%></div>
+			<div class="td left"><%= pcdata(backend_hint) %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%:Config detected%></div>
+			<div class="td left"><%= pcdata(has_config and "Yes" or "No, fallback port 19000 is used") %></div>
+		</div>
+	</div>
+	<div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+		<input class="btn cbi-button cbi-button-apply" type="button" value="<%:Open Backend%>" onclick="fileuniOpenBackend()" />
+		<span><%:This opens the FileUni web UI in a new browser tab using the port from config.toml.%></span>
+	</div>
+	<p style="margin-top: 0.75rem;"><%= pcdata(admin_reset_hint) %></p>
+</div>

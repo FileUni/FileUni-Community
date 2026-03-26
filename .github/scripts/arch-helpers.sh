@@ -164,3 +164,7 @@ fileuni_gui_base() {
       ;;
   esac
 }
+
+fileuni_luci_base() {
+  fileuni_build_base "luci-app" "all" "openwrt" "luci"
+}
