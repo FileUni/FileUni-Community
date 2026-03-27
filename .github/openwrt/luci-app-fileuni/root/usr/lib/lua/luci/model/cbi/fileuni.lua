@@ -5,8 +5,7 @@ local i18n = require "fileuni.i18n"
 local sys = require "luci.sys"
 local uci = require "luci.model.uci".cursor()
 
-local default_config_dir = "/etc/fileuni"
-local default_app_data_dir = "/var/lib/fileuni"
+local default_runtime_dir = "/var/lib/fileuni"
 local default_work_dir = "/var/lib/fileuni"
 local default_port = "19000"
 
@@ -98,8 +97,11 @@ local function build_language_meta()
 end
 
 local function build_backend_meta()
-	local config_dir = uci:get("fileuni", "main", "config_dir") or default_config_dir
-	local config_path = config_dir .. "/config.toml"
+	local runtime_dir = uci:get("fileuni", "main", "runtime_dir")
+		or uci:get("fileuni", "main", "app_data_dir")
+		or uci:get("fileuni", "main", "config_dir")
+		or default_runtime_dir
+	local config_path = runtime_dir .. "/config.toml"
 	local host, port, has_config = parse_server_bind(config_path)
 	local display_host = host or "router-host"
 	local normalized_host = display_host:lower()
@@ -112,7 +114,7 @@ local function build_backend_meta()
 	local binary_exists = fs.access("/usr/bin/fileuni")
 
 	return {
-		config_dir = config_dir,
+		runtime_dir = runtime_dir,
 		config_path = config_path,
 		host = host or "",
 		port = port,
@@ -123,7 +125,7 @@ local function build_backend_meta()
 			and ("http://<router-ip>:" .. port .. "/ui")
 			or ("http://" .. display_host .. ":" .. port .. "/ui"),
 		config_detected_text = has_config and tr("config_detected_yes") or tr("config_detected_no"),
-		admin_reset_hint = i18n.format(runtime_language, "admin_reset_hint", config_dir),
+		admin_reset_hint = i18n.format(runtime_language, "admin_reset_hint", runtime_dir),
 		labels = {
 			section_title = tr("backend_access"),
 			service_status = tr("service_status"),
@@ -154,15 +156,10 @@ local enabled = s:option(Flag, "enabled", tr("enable_on_boot"))
 enabled.rmempty = false
 enabled.default = enabled.disabled
 
-local config_dir = s:option(Value, "config_dir", tr("config_dir"))
-config_dir.rmempty = false
-config_dir.placeholder = default_config_dir
-config_dir.description = tr("config_dir_desc")
-
-local app_data_dir = s:option(Value, "app_data_dir", tr("app_data_dir"))
-app_data_dir.rmempty = false
-app_data_dir.placeholder = default_app_data_dir
-app_data_dir.description = tr("app_data_dir_desc")
+local runtime_dir = s:option(Value, "runtime_dir", tr("runtime_dir"))
+runtime_dir.rmempty = false
+runtime_dir.placeholder = default_runtime_dir
+runtime_dir.description = tr("runtime_dir_desc")
 
 local work_dir = s:option(Value, "work_dir", tr("work_dir"))
 work_dir.rmempty = false
