@@ -2163,7 +2163,7 @@ jobs:
             if [ -z "${commits}" ]; then
               echo "- No code changes detected in this range."
             else
-              printf '%s\n' "${commits}" | head -n 200
+              printf '%s\n' "${commits}" | sed -n '1,200p'
             fi
 
             echo
