@@ -96,7 +96,7 @@ If English isn't your first language, don't worry! We value your contributions r
 ### Configuration
 
 - [ ] No environment variables - All config from config files only
-- [ ] Config struct 100% matches `{config-date}/config.toml`
+- [ ] Config struct 100% matches `{runtime-dir}/config.toml`
 - [ ] No hardcoded paths - use `{APPDATADIR}` placeholder
 - [ ] Module business params in module's `config.rs`
 
