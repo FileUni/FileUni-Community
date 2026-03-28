@@ -1921,6 +1921,40 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Resolve npm publish metadata
+        shell: bash
+        env:
+          PKG_VERSION: ${{ needs.resolve-matrix.outputs.publish_version }}
+        run: |
+          set -euo pipefail
+
+          resolve_npm_channel() {
+            local version="$1"
+            local npm_tag="latest"
+            if [[ "${version}" == *-* ]]; then
+              local prerelease="${version#*-}"
+              prerelease="${prerelease%%.*}"
+              npm_tag="$(printf '%s' "${prerelease}" | sed 's/[0-9].*$//' | tr '[:upper:]' '[:lower:]')"
+              if [ -z "${npm_tag}" ]; then
+                npm_tag="next"
+              fi
+            fi
+            printf '%s' "${npm_tag}"
+          }
+
+          cli_npm_tag="$(resolve_npm_channel "${PKG_VERSION}")"
+          gui_pkg_version="${PKG_VERSION}-gui.0"
+          gui_npm_tag="gui"
+          if [[ "${PKG_VERSION}" == *-* ]]; then
+            gui_pkg_version="${PKG_VERSION}.gui.0"
+            gui_npm_tag="gui-${cli_npm_tag}"
+          fi
+
+          echo "CLI_NPM_TAG=${cli_npm_tag}" >> "$GITHUB_ENV"
+          echo "GUI_PKG_VERSION=${gui_pkg_version}" >> "$GITHUB_ENV"
+          echo "GUI_NPM_TAG=${gui_npm_tag}" >> "$GITHUB_ENV"
+          echo "::notice::cli_npm_tag=${cli_npm_tag} gui_pkg_version=${gui_pkg_version} gui_npm_tag=${gui_npm_tag}"
+
       - name: Build npm packages
         shell: bash
         env:
@@ -1928,6 +1962,9 @@ jobs:
           RELEASE_TAG: ${{ needs.resolve-matrix.outputs.release_tag }}
         run: |
           set -euo pipefail
+
+          rm -rf /tmp/npm-cli-root /tmp/npm-gui-root
+          mkdir -p /tmp/npm-cli-root /tmp/npm-gui-root
 
           if [ "${{ needs.resolve-matrix.outputs.has_cli }}" = "true" ]; then
             python3 .github/scripts/build_npm_package.py \
@@ -1937,7 +1974,7 @@ jobs:
               --license LICENSE \
               --version "${PKG_VERSION}" \
               --release-tag "${RELEASE_TAG}" \
-              --output /tmp/npm-root
+              --output /tmp/npm-cli-root
           fi
 
           if [ "${{ needs.resolve-matrix.outputs.has_gui }}" = "true" ]; then
@@ -1946,12 +1983,12 @@ jobs:
               --templates .github/npm/templates \
               --readme .github/npm/README.gui.package.md \
               --license LICENSE \
-              --version "${PKG_VERSION}" \
+              --version "${GUI_PKG_VERSION}" \
               --release-tag "${RELEASE_TAG}" \
-              --output /tmp/npm-root
+              --output /tmp/npm-gui-root
           fi
 
-          find /tmp/npm-root -maxdepth 4 -type f | sort
+          find /tmp/npm-cli-root /tmp/npm-gui-root -maxdepth 4 -type f 2>/dev/null | sort
 
       - name: Publish npm packages
         shell: bash
@@ -1959,24 +1996,15 @@ jobs:
           PKG_VERSION: ${{ needs.resolve-matrix.outputs.publish_version }}
         run: |
           set -euo pipefail
-          npm_tag="latest"
-          if [[ "${PKG_VERSION}" == *-* ]]; then
-            prerelease="${PKG_VERSION#*-}"
-            prerelease="${prerelease%%.*}"
-            npm_tag="$(printf '%s' "${prerelease}" | sed 's/[0-9].*$//' | tr '[:upper:]' '[:lower:]')"
-            if [ -z "${npm_tag}" ]; then
-              npm_tag="next"
-            fi
+
+          if [ -d /tmp/npm-cli-root/fileuni ]; then
+            echo "Publishing fileuni@${PKG_VERSION} with npm tag ${CLI_NPM_TAG}"
+            npm publish /tmp/npm-cli-root/fileuni --access public --provenance --tag "${CLI_NPM_TAG}"
           fi
 
-          if [ -d /tmp/npm-root/fileuni ]; then
-            echo "Publishing fileuni@${PKG_VERSION} with npm tag ${npm_tag}"
-            npm publish /tmp/npm-root/fileuni --access public --provenance --tag "${npm_tag}"
-          fi
-
-          if [ -d /tmp/npm-root/fileuni-gui ]; then
-            echo "Publishing fileuni-gui@${PKG_VERSION} with npm tag ${npm_tag}"
-            npm publish /tmp/npm-root/fileuni-gui --access public --provenance --tag "${npm_tag}"
+          if [ -d /tmp/npm-gui-root/fileuni ]; then
+            echo "Publishing fileuni@${GUI_PKG_VERSION} with npm tag ${GUI_NPM_TAG}"
+            npm publish /tmp/npm-gui-root/fileuni --access public --provenance --tag "${GUI_NPM_TAG}"
           fi
 
   build-pve-ct-template:

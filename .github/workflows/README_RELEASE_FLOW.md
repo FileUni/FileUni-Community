@@ -51,7 +51,7 @@ Important `workflow_dispatch` inputs:
 4. build-gui - Build GUI artifacts across desktop Tauri, Android, and iOS paths
 5. publish - Collect standardized `FileUni-*` artifacts, generate release notes, and publish the GitHub Release
 6. update-package-indexes - Update Homebrew tap, Scoop bucket, and Nix package sources for CLI and GUI after a full tag release
-7. publish-npm - Build and publish the `fileuni` and `fileuni-gui` npm packages after the GitHub Release is available
+7. publish-npm - Build and publish the `fileuni` CLI package plus the `fileuni@gui` GUI dist-tag after the GitHub Release is available
 
 ## Artifact Naming
 
@@ -70,7 +70,7 @@ The exact matrix is resolved from `.github/build_matrix.jsonc`, but the workflow
 - CLI FreeBSD builds
 - Linux package builds via nFPM
 - npm single-package distribution for CLI on Linux `gnu` / `musl`, Windows, macOS, Android, and FreeBSD
-- npm desktop-package distribution for GUI on Windows, Linux, and macOS
+- npm GUI distribution through `fileuni@gui` on Windows, Linux, and macOS
 - Homebrew formula updates for macOS and Linux CLI assets
 - Homebrew cask updates for macOS GUI assets
 - Scoop bucket updates for Windows CLI and GUI assets
@@ -87,16 +87,18 @@ The exact matrix is resolved from `.github/build_matrix.jsonc`, but the workflow
 - npm publish uses npm Trusted Publisher with GitHub Actions OIDC
 - no `NPM_TOKEN` secret is required for npm publishing
 - the npm package settings must trust `FileUni/FileUni-Project` and the `FileUni-release.yml` workflow
-- stable versions are published with the `latest` npm dist-tag, while prerelease versions derive a non-`latest` dist-tag from the semver prerelease label
-- the CLI package name is `fileuni`
-- the GUI package name is `fileuni-gui`
-- both packages auto-detect the current platform during `postinstall`
+- stable CLI versions are published with the `latest` npm dist-tag, while prerelease CLI versions derive a non-`latest` dist-tag from the semver prerelease label
+- stable GUI versions are published as `fileuni@gui`, while prerelease GUI versions use `fileuni@gui-<channel>`
+- the CLI and GUI npm publishes both use the `fileuni` package name
+- the CLI channel installs only the `fileuni` launcher
+- the GUI channel installs only the `fileuni-gui` launcher and uses GUI-specific env vars during `postinstall`
+- both npm variants auto-detect the current platform during `postinstall`
 - Linux defaults to `gnu` when detection is ambiguous, and users can override the target with package-specific env vars
 
 ## npm Package Layout
 
 - CLI package name: `fileuni`
-- GUI package name: `fileuni-gui`
+- GUI install channel: `fileuni@gui`
 - CLI target metadata is defined in `.github/npm/binary-targets.json`
 - GUI target metadata is defined in `.github/npm/gui-targets.json`
 - The generated packages contain only JavaScript launch/install files and download the real release assets from GitHub Releases on demand

@@ -3,10 +3,19 @@
 FileUni CLI distributed through npm as a single package.
 The package downloads the matching prebuilt binary from GitHub Releases during `postinstall`.
 
+The GUI channel is published separately as `fileuni@gui` and installs only the `fileuni-gui` launcher.
+
 ## Install
 
 ```bash
 npm install fileuni
+```
+
+## GUI Channel
+
+```bash
+npm install fileuni@gui
+npx fileuni-gui
 ```
 
 ## Run

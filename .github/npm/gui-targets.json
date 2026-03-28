@@ -1,8 +1,8 @@
 {
   "repository": "FileUni/FileUni-Project",
   "package": {
-    "name": "fileuni-gui",
-    "description": "FileUni GUI distributed through npm with on-demand desktop bundle downloads.",
+    "name": "fileuni",
+    "description": "FileUni GUI distributed through the fileuni@gui npm dist-tag with on-demand desktop bundle downloads.",
     "repository_directory": ".github/npm",
     "bin_name": "fileuni-gui",
     "display_name": "FileUni GUI",
