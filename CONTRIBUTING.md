@@ -86,10 +86,17 @@ If English isn't your first language, don't worry! We value your contributions r
 ### Frontend (TypeScript/React/Astro)
 
 - [ ] Zero `any` types - Use `bun run gen-api` for auto-generated types
-- [ ] Type check - `bun run check` must pass with zero errors and warnings
+- [ ] ESLint gate - `bun run lint` must pass with zero errors
+- [ ] Type check - `bun run typecheck` must pass with zero errors
+- [ ] Astro diagnostics - `bun run check` must pass with zero errors and warnings
+- [ ] Full frontend verification - `bun run verify` must pass before PR submission
 - [ ] Format - `bun run format` must pass
 - [ ] Use `openapi-fetch` from `src/lib/api.ts`
 - [ ] All `t('key')` must exist in all language files
+- [ ] Keep strict TypeScript settings enabled - do not relax `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, or `noPropertyAccessFromIndexSignature`
+- [ ] Keep hooks and accessibility lint gates green - do not bypass `react-hooks` or `jsx-a11y` rules
+- [ ] All `button` elements must declare `type`
+- [ ] Do not use array index as React list key when a stable business key exists
 - [ ] Modals close on `Esc` key
 - [ ] Minimum sizes: font ≥ 14px, button ≥ 32px height, clickable icons ≥ 24px
 
@@ -138,7 +145,7 @@ cargo fmt --check
 
 Frontend:
 ```bash
-cd frontends && bun run check
+cd frontends && bun run verify
 ```
 
 ---
