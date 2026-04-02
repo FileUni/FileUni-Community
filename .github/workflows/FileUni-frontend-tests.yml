@@ -1,0 +1,61 @@
+name: FileUni Frontend Tests
+
+# This workflow is dispatched only when changes under frontends/ are detected
+# by FileUni-WorkSpace/.github/workflows/trigger-project-integration-tests.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace_ref:
+        description: "Source ref in FileUni-WorkSpace (branch/tag/sha). Default: main"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-tests-${{ github.event.inputs.workspace_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  WORKSPACE_REPO: FileUni/FileUni-WorkSpace
+
+jobs:
+  frontends-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: frontends-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            frontends-bun-${{ runner.os }}-
+
+      - name: Verify frontends project
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run verify
