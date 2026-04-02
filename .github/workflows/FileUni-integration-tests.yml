@@ -303,7 +303,169 @@ jobs:
           RUST_TEST_THREADS: 1
         run: cargo test --locked -p fileuni --test user_account_smoke -- --nocapture
 
-  feature-modules-smoke:
+  user-account-smoke-postgres-database:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: fileuni_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fileuni_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run user account smoke tests on PostgreSQL + DB KV
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          FILEUNI_TEST_DB_BACKEND: postgres
+          FILEUNI_TEST_KV_BACKEND: database
+          FILEUNI_TEST_POSTGRES_DSN: postgres://postgres:postgres@127.0.0.1:5432/fileuni_test
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: cargo test --locked -p fileuni --test user_account_smoke -- --nocapture
+
+  user-account-smoke-postgres-redis:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: fileuni_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fileuni_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run user account smoke tests on PostgreSQL + Redis KV
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          FILEUNI_TEST_DB_BACKEND: postgres
+          FILEUNI_TEST_KV_BACKEND: redis
+          FILEUNI_TEST_KV_REDIS_URL: redis://127.0.0.1:6379/0
+          FILEUNI_TEST_POSTGRES_DSN: postgres://postgres:postgres@127.0.0.1:5432/fileuni_test
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: cargo test --locked -p fileuni --test user_account_smoke -- --nocapture
+
+  chat-smoke:
     runs-on: ubuntu-latest
     steps:
       - name: Resolve workspace ref
@@ -354,13 +516,327 @@ jobs:
           workspaces: |
             workspace -> target
 
-      - name: Run feature modules smoke tests
+      - name: Run chat smoke tests
         working-directory: workspace
         env:
           CARGO_TERM_COLOR: always
           RUST_BACKTRACE: 1
           RUST_TEST_THREADS: 1
-        run: cargo test --locked -p fileuni --test feature_modules_smoke -- --nocapture
+        run: cargo test --locked -p fileuni --test chat_smoke -- --nocapture
+
+  email-basic-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run email basic smoke tests
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: cargo test --locked -p fileuni --test email_basic_smoke -- --nocapture
+
+  website-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run website smoke tests
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: cargo test --locked -p fileuni --test website_smoke -- --nocapture
+
+  domain-acme-ddns-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run domain acme ddns smoke tests
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: cargo test --locked -p fileuni --test domain_acme_ddns_smoke -- --nocapture
+
+  acme-ddns-callback-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run acme-ddns callback smoke tests
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: cargo test --locked -p fileuni --test acme_ddns_callback_smoke -- --nocapture
+
+  mail-docker-smoke:
+    runs-on: ubuntu-latest
+    services:
+      greenmail:
+        image: greenmail/standalone:2.1.7
+        env:
+          GREENMAIL_OPTS: >-
+            -Dgreenmail.setup.test.smtp
+            -Dgreenmail.setup.test.imap
+            -Dgreenmail.hostname=0.0.0.0
+            -Dgreenmail.users=smoke:mail-password@example.com
+        ports:
+          - 3025:3025
+          - 3143:3143
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run mail docker smoke tests
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          FILEUNI_TEST_MAIL_IMAP_HOST: 127.0.0.1
+          FILEUNI_TEST_MAIL_IMAP_PORT: 3143
+          FILEUNI_TEST_MAIL_SMTP_HOST: 127.0.0.1
+          FILEUNI_TEST_MAIL_SMTP_PORT: 3025
+          FILEUNI_TEST_MAIL_USERNAME: smoke
+          FILEUNI_TEST_MAIL_PASSWORD: mail-password
+          FILEUNI_TEST_MAIL_ADDRESS: smoke@example.com
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: cargo test --locked -p fileuni --test mail_docker_smoke -- --nocapture
 
   webdav-smoke:
     runs-on: ubuntu-latest
