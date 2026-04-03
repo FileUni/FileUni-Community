@@ -98,6 +98,8 @@ jobs:
 
           for test_name in \
             web_api_smoke \
+            cli_runtime_smoke \
+            runtime_context_smoke \
             web_api_low_resource_smoke \
             web_api_low_resource_restart_smoke \
             web_api_boundary_smoke \
@@ -112,7 +114,9 @@ jobs:
             webdav_smoke \
             webdav_low_resource_smoke \
             nextcloud_smoke \
+            nextcloud_chunked_smoke \
             s3_smoke \
+            s3_multipart_smoke \
             wal_recovery_smoke \
             sftp_smoke \
             ftp_smoke \
@@ -143,6 +147,10 @@ jobs:
         include:
           - job_name: web-api-smoke
             test_name: web_api_smoke
+          - job_name: cli-runtime-smoke
+            test_name: cli_runtime_smoke
+          - job_name: runtime-context-smoke
+            test_name: runtime_context_smoke
           - job_name: web-api-boundary-smoke
             test_name: web_api_boundary_smoke
           - job_name: user-account-smoke
@@ -165,8 +173,12 @@ jobs:
             test_name: webdav_smoke
           - job_name: nextcloud-smoke
             test_name: nextcloud_smoke
+          - job_name: nextcloud-chunked-smoke
+            test_name: nextcloud_chunked_smoke
           - job_name: s3-smoke
             test_name: s3_smoke
+          - job_name: s3-multipart-smoke
+            test_name: s3_multipart_smoke
           - job_name: wal-recovery-smoke
             test_name: wal_recovery_smoke
           - job_name: sftp-smoke
