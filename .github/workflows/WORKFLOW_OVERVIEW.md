@@ -18,14 +18,13 @@ This directory contains the public-repository workflow entrypoints.
 
 ## Rust Integration Layout
 
-`ci-rust-integration.yml` groups smoke tests by runtime profile instead of compiling in one job per test case.
+`ci-rust-integration.yml` first builds a reusable smoke-test bundle once, then fans out into one matrix job per smoke scenario.
 
-- Base suites cover HTTP, cloud, feature, website, and file-protocol smoke tests.
-- PostgreSQL suites cover the database-backed and Redis-backed variants.
-- Mail suites cover the SMTP/IMAP scenarios across supported backend combinations.
-- The remote-mount suite isolates the `rclone` dependency.
+- `prepare-smoke-bundle` builds frontend assets, the `fileuni` binary, and all integration-test executables exactly once.
+- Base smoke scenarios run as individual jobs again, so the Actions UI still shows one card per test.
+- PostgreSQL, Redis, mail, and `rclone` scenarios remain isolated per test case while reusing the same prebuilt bundle.
 
-This keeps the matrix understandable while avoiding the previous one-workflow-per-test explosion.
+This keeps per-test visibility without repeating frontend and Rust compilation in every job.
 
 ## Release Notes
 

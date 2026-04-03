@@ -17,21 +17,12 @@ concurrency:
 
 env:
   WORKSPACE_REPO: FileUni/FileUni-WorkSpace
+  SMOKE_BUNDLE_ARTIFACT: rust-integration-smoke-bundle
 
 jobs:
-  base-suite:
-    name: ${{ matrix.name }}
+  prepare-smoke-bundle:
+    name: Prepare smoke bundle
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: Core HTTP and cloud smoke
-            tests: web_api_smoke user_account_smoke webdav_smoke nextcloud_smoke s3_smoke
-          - name: Feature and website smoke
-            tests: chat_smoke email_basic_smoke website_smoke website_proxy_smoke extension_startup_smoke domain_acme_ddns_smoke acme_ddns_callback_smoke
-          - name: File protocol smoke
-            tests: sftp_smoke ftp_smoke
     steps:
       - name: Resolve workspace ref
         id: resolve-ref
@@ -84,27 +75,135 @@ jobs:
           workspaces: |
             workspace -> target
 
-      - name: Run grouped smoke tests
+      - name: Build smoke bundle
         working-directory: workspace
-        env:
-          CARGO_TERM_COLOR: always
-          RUST_BACKTRACE: 1
-          RUST_TEST_THREADS: 1
-        run: bash apps/integration-tests/run-smoke-test.sh ${{ matrix.tests }}
+        shell: bash
+        run: |
+          set -euo pipefail
 
-  postgres-suite:
-    name: ${{ matrix.name }}
+          bundle_dir="$PWD/.ci/smoke-bundle"
+          mkdir -p "$bundle_dir"
+
+          cargo build --locked -p fileuni --bin fileuni
+          install -m 755 target/debug/fileuni "$bundle_dir/fileuni"
+
+          cargo test --locked -p fileuni-integration-tests --tests --no-run --message-format=json \
+            > "$bundle_dir/test-build.jsonl"
+
+          jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and (.target.kind[]? == "test") and .executable != null) | [.target.name, .executable] | @tsv' "$bundle_dir/test-build.jsonl" \
+            | while IFS=$'\t' read -r test_name executable_path; do
+                install -m 755 "$executable_path" "$bundle_dir/$test_name"
+              done
+
+          for test_name in \
+            web_api_smoke \
+            user_account_smoke \
+            chat_smoke \
+            email_basic_smoke \
+            website_smoke \
+            domain_acme_ddns_smoke \
+            acme_ddns_callback_smoke \
+            website_proxy_smoke \
+            extension_startup_smoke \
+            webdav_smoke \
+            nextcloud_smoke \
+            s3_smoke \
+            sftp_smoke \
+            ftp_smoke \
+            mail_docker_smoke \
+            remote_mount_rclone_smoke
+          do
+            test -x "$bundle_dir/$test_name"
+          done
+
+      - name: Upload smoke bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: workspace/.ci/smoke-bundle/
+          retention-days: 1
+
+  base-smoke:
+    name: ${{ matrix.job_name }}
     runs-on: ubuntu-latest
+    needs: prepare-smoke-bundle
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Postgres plus database KV smoke
+          - job_name: web-api-smoke
+            test_name: web_api_smoke
+          - job_name: user-account-smoke
+            test_name: user_account_smoke
+          - job_name: chat-smoke
+            test_name: chat_smoke
+          - job_name: email-basic-smoke
+            test_name: email_basic_smoke
+          - job_name: website-smoke
+            test_name: website_smoke
+          - job_name: domain-acme-ddns-smoke
+            test_name: domain_acme_ddns_smoke
+          - job_name: acme-ddns-callback-smoke
+            test_name: acme_ddns_callback_smoke
+          - job_name: website-proxy-smoke
+            test_name: website_proxy_smoke
+          - job_name: extension-startup-smoke
+            test_name: extension_startup_smoke
+          - job_name: webdav-smoke
+            test_name: webdav_smoke
+          - job_name: nextcloud-smoke
+            test_name: nextcloud_smoke
+          - job_name: s3-smoke
+            test_name: s3_smoke
+          - job_name: sftp-smoke
+            test_name: sftp_smoke
+          - job_name: ftp-smoke
+            test_name: ftp_smoke
+    steps:
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Run smoke test
+        shell: bash
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: |
+          set -euo pipefail
+
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
+          "smoke-bundle/${{ matrix.test_name }}" --nocapture
+
+  postgres-smoke:
+    name: ${{ matrix.job_name }}
+    runs-on: ubuntu-latest
+    needs: prepare-smoke-bundle
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - job_name: web-api-smoke-postgres-database
+            test_name: web_api_smoke
             kv_backend: database
-            tests: web_api_smoke user_account_smoke nextcloud_smoke
-          - name: Postgres plus Redis KV smoke
+          - job_name: web-api-smoke-postgres-redis
+            test_name: web_api_smoke
             kv_backend: redis
-            tests: web_api_smoke user_account_smoke nextcloud_smoke
+          - job_name: user-account-smoke-postgres-database
+            test_name: user_account_smoke
+            kv_backend: database
+          - job_name: user-account-smoke-postgres-redis
+            test_name: user_account_smoke
+            kv_backend: redis
+          - job_name: nextcloud-smoke-postgres-database
+            test_name: nextcloud_smoke
+            kv_backend: database
+          - job_name: nextcloud-smoke-postgres-redis
+            test_name: nextcloud_smoke
+            kv_backend: redis
     services:
       postgres:
         image: postgres:17-alpine
@@ -129,88 +228,45 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - name: Resolve workspace ref
-        id: resolve-ref
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Run smoke test
         shell: bash
-        run: |
-          set -euo pipefail
-
-          ref="${{ github.event.inputs.workspace_ref }}"
-          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout workspace
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ steps.resolve-ref.outputs.ref }}
-          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
-          path: workspace
-          submodules: true
-          fetch-depth: 0
-
-      - name: Sync favicon
-        run: bash workspace/script/fileSync.sh
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Cache Bun
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.bun/install/cache
-            workspace/frontends/node_modules
-          key: rust-ci-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
-          restore-keys: |
-            rust-ci-bun-${{ runner.os }}-
-
-      - name: Build frontend assets
-        working-directory: workspace/frontends
-        run: |
-          bun install --frozen-lockfile
-          bun run build
-          test -f dist/index.html
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            workspace -> target
-
-      - name: Run grouped smoke tests
-        working-directory: workspace
         env:
-          CARGO_TERM_COLOR: always
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
           FILEUNI_TEST_DB_BACKEND: postgres
           FILEUNI_TEST_KV_BACKEND: ${{ matrix.kv_backend }}
           FILEUNI_TEST_KV_REDIS_URL: redis://127.0.0.1:6379/0
           FILEUNI_TEST_POSTGRES_DSN: postgres://postgres:postgres@127.0.0.1:5432/fileuni_test
           RUST_BACKTRACE: 1
           RUST_TEST_THREADS: 1
-        run: bash apps/integration-tests/run-smoke-test.sh ${{ matrix.tests }}
+        run: |
+          set -euo pipefail
 
-  mail-suite:
-    name: ${{ matrix.name }}
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
+          "smoke-bundle/${{ matrix.test_name }}" --nocapture
+
+  mail-smoke:
+    name: ${{ matrix.job_name }}
     runs-on: ubuntu-latest
+    needs: prepare-smoke-bundle
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: Mail smoke
+          - job_name: mail-docker-smoke
             db_backend: sqlite
             kv_backend: dashmap
-            tests: mail_docker_smoke
-          - name: Mail smoke with Postgres plus database KV
+          - job_name: mail-docker-smoke-postgres-database
             db_backend: postgres
             kv_backend: database
-            tests: mail_docker_smoke
-          - name: Mail smoke with Postgres plus Redis KV
+          - job_name: mail-docker-smoke-postgres-redis
             db_backend: postgres
             kv_backend: redis
-            tests: mail_docker_smoke
     services:
       greenmail:
         image: greenmail/standalone:2.1.7
@@ -246,61 +302,16 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - name: Resolve workspace ref
-        id: resolve-ref
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Run smoke test
         shell: bash
-        run: |
-          set -euo pipefail
-
-          ref="${{ github.event.inputs.workspace_ref }}"
-          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout workspace
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ steps.resolve-ref.outputs.ref }}
-          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
-          path: workspace
-          submodules: true
-          fetch-depth: 0
-
-      - name: Sync favicon
-        run: bash workspace/script/fileSync.sh
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Cache Bun
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.bun/install/cache
-            workspace/frontends/node_modules
-          key: rust-ci-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
-          restore-keys: |
-            rust-ci-bun-${{ runner.os }}-
-
-      - name: Build frontend assets
-        working-directory: workspace/frontends
-        run: |
-          bun install --frozen-lockfile
-          bun run build
-          test -f dist/index.html
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            workspace -> target
-
-      - name: Run grouped smoke tests
-        working-directory: workspace
         env:
-          CARGO_TERM_COLOR: always
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
           FILEUNI_TEST_DB_BACKEND: ${{ matrix.db_backend }}
           FILEUNI_TEST_KV_BACKEND: ${{ matrix.kv_backend }}
           FILEUNI_TEST_KV_REDIS_URL: redis://127.0.0.1:6379/0
@@ -314,72 +325,36 @@ jobs:
           FILEUNI_TEST_MAIL_ADDRESS: smoke@example.com
           RUST_BACKTRACE: 1
           RUST_TEST_THREADS: 1
-        run: bash apps/integration-tests/run-smoke-test.sh ${{ matrix.tests }}
-
-  remote-mount-suite:
-    name: Remote mount smoke
-    runs-on: ubuntu-latest
-    steps:
-      - name: Resolve workspace ref
-        id: resolve-ref
-        shell: bash
         run: |
           set -euo pipefail
 
-          ref="${{ github.event.inputs.workspace_ref }}"
-          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/mail_docker_smoke"
+          "smoke-bundle/mail_docker_smoke" --nocapture
 
-      - name: Checkout workspace
-        uses: actions/checkout@v4
+  remote-mount-smoke:
+    name: remote-mount-rclone-smoke
+    runs-on: ubuntu-latest
+    needs: prepare-smoke-bundle
+    steps:
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
         with:
-          repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ steps.resolve-ref.outputs.ref }}
-          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
-          path: workspace
-          submodules: true
-          fetch-depth: 0
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
 
       - name: Install rclone
         run: |
           sudo apt-get update
           sudo apt-get install -y rclone
 
-      - name: Sync favicon
-        run: bash workspace/script/fileSync.sh
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Cache Bun
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.bun/install/cache
-            workspace/frontends/node_modules
-          key: rust-ci-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
-          restore-keys: |
-            rust-ci-bun-${{ runner.os }}-
-
-      - name: Build frontend assets
-        working-directory: workspace/frontends
-        run: |
-          bun install --frozen-lockfile
-          bun run build
-          test -f dist/index.html
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            workspace -> target
-
-      - name: Run remote mount smoke test
-        working-directory: workspace
+      - name: Run smoke test
+        shell: bash
         env:
-          CARGO_TERM_COLOR: always
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
           RUST_BACKTRACE: 1
           RUST_TEST_THREADS: 1
-        run: bash apps/integration-tests/run-smoke-test.sh remote_mount_rclone_smoke
+        run: |
+          set -euo pipefail
+
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/remote_mount_rclone_smoke"
+          "smoke-bundle/remote_mount_rclone_smoke" --nocapture
