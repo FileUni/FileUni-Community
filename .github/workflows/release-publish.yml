@@ -103,7 +103,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ steps.resolve-ref.outputs.ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
           path: workspace
           submodules: true
           fetch-depth: 0
@@ -257,7 +257,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
           path: workspace
           submodules: true
 
@@ -309,7 +309,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
           path: workspace
           submodules: true
           fetch-depth: 0
@@ -547,7 +547,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
           path: workspace
           submodules: true
 
@@ -650,7 +650,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
           path: workspace
           submodules: true
 
@@ -763,7 +763,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
           path: workspace
           submodules: true
 
@@ -1015,7 +1015,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
           path: workspace
           submodules: true
 
@@ -1224,7 +1224,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
           path: workspace
           submodules: true
 
@@ -1432,7 +1432,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
           path: workspace
           submodules: true
 
@@ -1843,10 +1843,10 @@ jobs:
       - name: Clone package repositories
         shell: bash
         env:
-          FILEUNI_WORKSPACE_PAT: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
         run: |
           set -euo pipefail
-          base_url="https://x-access-token:${FILEUNI_WORKSPACE_PAT}@github.com/FileUni"
+          base_url="https://x-access-token:${FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN}@github.com/FileUni"
           git clone --depth 1 "${base_url}/homebrew-fileuni.git" /tmp/package-repos/homebrew-fileuni
           git clone --depth 1 "${base_url}/scoop-fileuni.git" /tmp/package-repos/scoop-fileuni
           git clone --depth 1 "${base_url}/nixpkgs-fileuni.git" /tmp/package-repos/nixpkgs-fileuni
@@ -2100,7 +2100,7 @@ jobs:
         with:
           repository: ${{ env.WORKSPACE_REPO }}
           ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
           path: workspace
           fetch-depth: 0
           fetch-tags: true
