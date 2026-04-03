@@ -343,8 +343,14 @@ jobs:
 
       - name: Install rclone
         run: |
-          sudo apt-get update
-          sudo apt-get install -y rclone
+          set -euo pipefail
+
+          curl -fsSL "https://downloads.rclone.org/rclone-current-linux-amd64.zip" -o /tmp/rclone.zip
+          rm -rf /tmp/rclone-extract
+          mkdir -p /tmp/rclone-extract
+          unzip -q /tmp/rclone.zip -d /tmp/rclone-extract
+          sudo install -m 755 /tmp/rclone-extract/rclone-*-linux-amd64/rclone /usr/local/bin/rclone
+          rclone version
 
       - name: Run smoke test
         shell: bash
