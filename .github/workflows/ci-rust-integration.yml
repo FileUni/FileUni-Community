@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-rust-integration-${{ github.event.inputs.workspace_ref || github.run_id }}
+  group: ci-rust-integration-single-flight
   cancel-in-progress: true
 
 env:
@@ -23,6 +23,7 @@ jobs:
   prepare-smoke-bundle:
     name: Prepare smoke bundle
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     steps:
       - name: Resolve workspace ref
         id: resolve-ref
@@ -84,10 +85,11 @@ jobs:
           bundle_dir="$PWD/.ci/smoke-bundle"
           mkdir -p "$bundle_dir"
 
-          cargo build --locked -p fileuni --bin fileuni -p fileuni-integration-tests --tests --message-format=json \
+          cargo build --locked -p fileuni --bin fileuni -p fileuni-integration-tests --tests --bins --message-format=json \
             > "$bundle_dir/build.jsonl"
 
           install -m 755 target/debug/fileuni "$bundle_dir/fileuni"
+          install -m 755 target/debug/fileuni_e2e_server "$bundle_dir/fileuni_e2e_server"
 
           jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and (.target.kind[]? == "test") and .executable != null) | [.target.name, .executable] | @tsv' "$bundle_dir/build.jsonl" \
             | while IFS=$'\t' read -r test_name executable_path; do
@@ -96,6 +98,9 @@ jobs:
 
           for test_name in \
             web_api_smoke \
+            web_api_low_resource_smoke \
+            web_api_low_resource_restart_smoke \
+            web_api_boundary_smoke \
             user_account_smoke \
             chat_smoke \
             email_basic_smoke \
@@ -105,15 +110,19 @@ jobs:
             website_proxy_smoke \
             extension_startup_smoke \
             webdav_smoke \
+            webdav_low_resource_smoke \
             nextcloud_smoke \
             s3_smoke \
+            wal_recovery_smoke \
             sftp_smoke \
             ftp_smoke \
             mail_docker_smoke \
+            remote_mount_timeout_smoke \
             remote_mount_rclone_smoke
           do
             test -x "$bundle_dir/$test_name"
           done
+          test -x "$bundle_dir/fileuni_e2e_server"
 
       - name: Upload smoke bundle artifact
         uses: actions/upload-artifact@v4
@@ -126,12 +135,16 @@ jobs:
     name: ${{ matrix.job_name }}
     runs-on: ubuntu-latest
     needs: prepare-smoke-bundle
+    timeout-minutes: 90
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
           - job_name: web-api-smoke
             test_name: web_api_smoke
+          - job_name: web-api-boundary-smoke
+            test_name: web_api_boundary_smoke
           - job_name: user-account-smoke
             test_name: user_account_smoke
           - job_name: chat-smoke
@@ -154,6 +167,8 @@ jobs:
             test_name: nextcloud_smoke
           - job_name: s3-smoke
             test_name: s3_smoke
+          - job_name: wal-recovery-smoke
+            test_name: wal_recovery_smoke
           - job_name: sftp-smoke
             test_name: sftp_smoke
           - job_name: ftp-smoke
@@ -180,9 +195,11 @@ jobs:
   postgres-smoke:
     name: ${{ matrix.job_name }}
     runs-on: ubuntu-latest
-    needs: prepare-smoke-bundle
+    needs: redis-disconnect-smoke
+    timeout-minutes: 90
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
           - job_name: web-api-smoke-postgres-database
@@ -252,9 +269,11 @@ jobs:
   mail-smoke:
     name: ${{ matrix.job_name }}
     runs-on: ubuntu-latest
-    needs: prepare-smoke-bundle
+    needs: large-file-heavy-smoke
+    timeout-minutes: 90
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         include:
           - job_name: mail-docker-smoke
@@ -331,9 +350,19 @@ jobs:
           "smoke-bundle/mail_docker_smoke" --nocapture
 
   remote-mount-smoke:
-    name: remote-mount-rclone-smoke
+    name: ${{ matrix.job_name }}
     runs-on: ubuntu-latest
-    needs: prepare-smoke-bundle
+    needs: mail-smoke
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        include:
+          - job_name: remote-mount-rclone-smoke
+            test_name: remote_mount_rclone_smoke
+          - job_name: remote-mount-timeout-smoke
+            test_name: remote_mount_timeout_smoke
     steps:
       - name: Download smoke bundle artifact
         uses: actions/download-artifact@v4
@@ -361,5 +390,378 @@ jobs:
         run: |
           set -euo pipefail
 
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/remote_mount_rclone_smoke"
-          "smoke-bundle/remote_mount_rclone_smoke" --nocapture
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
+          "smoke-bundle/${{ matrix.test_name }}" --nocapture
+
+  webui-e2e:
+    name: webui-e2e-playwright
+    runs-on: ubuntu-latest
+    needs: remote-mount-smoke
+    timeout-minutes: 90
+    steps:
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ github.event.inputs.workspace_ref || 'main' }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install Playwright dependencies
+        working-directory: workspace/apps/integration-tests/e2e
+        run: |
+          bun install --frozen-lockfile
+          bunx playwright install --with-deps chromium
+
+      - name: Run web UI E2E test
+        working-directory: workspace/apps/integration-tests/e2e
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_E2E_BASE_URL: http://127.0.0.1:4010
+          FILEUNI_E2E_SERVER_COMMAND: ${{ github.workspace }}/smoke-bundle/fileuni_e2e_server --port 4010
+        run: |
+          chmod +x "${GITHUB_WORKSPACE}/smoke-bundle/fileuni" "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_e2e_server"
+          bun run test
+
+  postgres-disconnect-smoke:
+    name: postgres-disconnect-smoke
+    runs-on: ubuntu-latest
+    needs: ultra-low-resource-basic-smoke
+    timeout-minutes: 90
+    steps:
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Start PostgreSQL container
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker rm -f fileuni-it-postgres-disconnect >/dev/null 2>&1 || true
+          docker run -d --name fileuni-it-postgres-disconnect \
+            -e POSTGRES_DB=fileuni_test \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_USER=postgres \
+            -p 55432:5432 \
+            --health-cmd "pg_isready -U postgres -d fileuni_test" \
+            --health-interval 5s \
+            --health-timeout 5s \
+            --health-retries 20 \
+            postgres:17-alpine
+
+          for _ in $(seq 1 60); do
+            if [ "$(docker inspect -f '{{.State.Health.Status}}' fileuni-it-postgres-disconnect)" = "healthy" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs fileuni-it-postgres-disconnect
+          exit 1
+
+      - name: Run PostgreSQL disconnect smoke test
+        shell: bash
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_DB_BACKEND: postgres
+          FILEUNI_TEST_KV_BACKEND: dashmap
+          FILEUNI_TEST_POSTGRES_DSN: postgres://postgres:postgres@127.0.0.1:55432/fileuni_test
+          FILEUNI_TEST_ENABLE_POSTGRES_DISCONNECT: 1
+          FILEUNI_TEST_POSTGRES_CONTAINER_NAME: fileuni-it-postgres-disconnect
+          FILEUNI_TEST_POSTGRES_PORT: 55432
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: |
+          set -euo pipefail
+
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_smoke"
+          "smoke-bundle/web_api_smoke" web_api_smoke_handles_postgres_disconnect_and_recovery --nocapture
+
+      - name: Cleanup PostgreSQL container
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker rm -f fileuni-it-postgres-disconnect >/dev/null 2>&1 || true
+
+  low-resource-basic-smoke:
+    name: low-resource-basic-smoke
+    runs-on: ubuntu-latest
+    needs: base-smoke
+    timeout-minutes: 90
+    steps:
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Prepare low-resource smoke bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x \
+            "smoke-bundle/fileuni" \
+            "smoke-bundle/web_api_low_resource_smoke" \
+            "smoke-bundle/web_api_low_resource_restart_smoke" \
+            "smoke-bundle/webdav_low_resource_smoke"
+
+      - name: Run low-resource Web API smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --memory=64m \
+            --memory-swap=64m \
+            --cpus=0.5 \
+            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
+            -e FILEUNI_TEST_DB_BACKEND=sqlite \
+            -e FILEUNI_TEST_KV_BACKEND=database \
+            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
+            -e RUST_BACKTRACE=1 \
+            -e RUST_TEST_THREADS=1 \
+            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
+            ubuntu:24.04 \
+            /smoke-bundle/web_api_low_resource_smoke --nocapture
+
+      - name: Run low-resource WebDAV smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --memory=64m \
+            --memory-swap=64m \
+            --cpus=0.5 \
+            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
+            -e FILEUNI_TEST_DB_BACKEND=sqlite \
+            -e FILEUNI_TEST_KV_BACKEND=database \
+            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
+            -e RUST_BACKTRACE=1 \
+            -e RUST_TEST_THREADS=1 \
+            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
+            ubuntu:24.04 \
+            /smoke-bundle/webdav_low_resource_smoke --nocapture
+
+      - name: Run low-resource Web API restart smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --memory=64m \
+            --memory-swap=64m \
+            --cpus=0.5 \
+            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
+            -e FILEUNI_TEST_DB_BACKEND=sqlite \
+            -e FILEUNI_TEST_KV_BACKEND=database \
+            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
+            -e RUST_BACKTRACE=1 \
+            -e RUST_TEST_THREADS=1 \
+            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
+            ubuntu:24.04 \
+            /smoke-bundle/web_api_low_resource_restart_smoke --nocapture
+
+  ultra-low-resource-basic-smoke:
+    name: ultra-low-resource-basic-smoke
+    runs-on: ubuntu-latest
+    needs: low-resource-basic-smoke
+    timeout-minutes: 90
+    steps:
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Prepare ultra-low-resource smoke bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x \
+            "smoke-bundle/fileuni" \
+            "smoke-bundle/web_api_low_resource_smoke" \
+            "smoke-bundle/web_api_low_resource_restart_smoke" \
+            "smoke-bundle/webdav_low_resource_smoke"
+
+      - name: Run ultra-low-resource Web API smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --memory=48m \
+            --memory-swap=48m \
+            --cpus=0.25 \
+            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
+            -e FILEUNI_TEST_DB_BACKEND=sqlite \
+            -e FILEUNI_TEST_KV_BACKEND=database \
+            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
+            -e RUST_BACKTRACE=1 \
+            -e RUST_TEST_THREADS=1 \
+            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
+            ubuntu:24.04 \
+            /smoke-bundle/web_api_low_resource_smoke --nocapture
+
+      - name: Run ultra-low-resource WebDAV smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --memory=48m \
+            --memory-swap=48m \
+            --cpus=0.25 \
+            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
+            -e FILEUNI_TEST_DB_BACKEND=sqlite \
+            -e FILEUNI_TEST_KV_BACKEND=database \
+            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
+            -e RUST_BACKTRACE=1 \
+            -e RUST_TEST_THREADS=1 \
+            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
+            ubuntu:24.04 \
+            /smoke-bundle/webdav_low_resource_smoke --nocapture
+
+      - name: Run ultra-low-resource Web API restart smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker run --rm \
+            --memory=48m \
+            --memory-swap=48m \
+            --cpus=0.25 \
+            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
+            -e FILEUNI_TEST_DB_BACKEND=sqlite \
+            -e FILEUNI_TEST_KV_BACKEND=database \
+            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
+            -e RUST_BACKTRACE=1 \
+            -e RUST_TEST_THREADS=1 \
+            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
+            ubuntu:24.04 \
+            /smoke-bundle/web_api_low_resource_restart_smoke --nocapture
+
+  redis-disconnect-smoke:
+    name: redis-disconnect-smoke
+    runs-on: ubuntu-latest
+    needs: postgres-disconnect-smoke
+    timeout-minutes: 90
+    steps:
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Start Redis container
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          docker rm -f fileuni-it-redis-disconnect >/dev/null 2>&1 || true
+          docker run -d --name fileuni-it-redis-disconnect \
+            -p 56379:6379 \
+            --health-cmd "redis-cli ping" \
+            --health-interval 5s \
+            --health-timeout 5s \
+            --health-retries 20 \
+            redis:7-alpine
+
+          for _ in $(seq 1 60); do
+            if [ "$(docker inspect -f '{{.State.Health.Status}}' fileuni-it-redis-disconnect)" = "healthy" ]; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs fileuni-it-redis-disconnect
+          exit 1
+
+      - name: Run Redis disconnect smoke test
+        shell: bash
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_KV_BACKEND: redis
+          FILEUNI_TEST_KV_REDIS_URL: redis://127.0.0.1:56379/0
+          FILEUNI_TEST_ENABLE_REDIS_DISCONNECT: 1
+          FILEUNI_TEST_REDIS_CONTAINER_NAME: fileuni-it-redis-disconnect
+          FILEUNI_TEST_REDIS_PORT: 56379
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: |
+          set -euo pipefail
+
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_smoke"
+          "smoke-bundle/web_api_smoke" web_api_smoke_handles_redis_disconnect_and_recovery --nocapture
+
+      - name: Cleanup Redis container
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker rm -f fileuni-it-redis-disconnect >/dev/null 2>&1 || true
+
+  wal-inflight-smoke:
+    name: wal-inflight-smoke
+    runs-on: ubuntu-latest
+    needs: postgres-smoke
+    timeout-minutes: 90
+    steps:
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Run inflight WAL recovery smoke test
+        shell: bash
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_ENABLE_WAL_INFLIGHT: 1
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: |
+          set -euo pipefail
+
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/wal_recovery_smoke"
+          "smoke-bundle/wal_recovery_smoke" wal_recovery_smoke_handles_real_inflight_stream_upload_when_enabled --nocapture
+
+  large-file-heavy-smoke:
+    name: large-file-heavy-smoke
+    runs-on: ubuntu-latest
+    needs: wal-inflight-smoke
+    timeout-minutes: 90
+    steps:
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Run heavy large-file boundary smoke test
+        shell: bash
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_HEAVY_LARGE_FILE_GIB: 2
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: |
+          set -euo pipefail
+
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_boundary_smoke"
+          "smoke-bundle/web_api_boundary_smoke" web_api_boundary_smoke_covers_heavy_large_file_streaming_upload --nocapture
