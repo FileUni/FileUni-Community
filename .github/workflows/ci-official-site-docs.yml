@@ -1,7 +1,7 @@
 name: Official Site Docs CI
 
 # This workflow is dispatched only when changes under OfficialSiteDocs/ are detected
-# by FileUni-WorkSpace/.github/workflows/dispatch-project-ci.yml.
+# by FileUni-WorkSpace/.github/workflows/trigger-public-project-ci.yml.
 
 on:
   workflow_dispatch:

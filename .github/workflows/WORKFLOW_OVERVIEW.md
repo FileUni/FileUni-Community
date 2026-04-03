@@ -30,7 +30,7 @@ This keeps the matrix understandable while avoiding the previous one-workflow-pe
 ## Release Notes
 
 - `release-publish.yml` is a `workflow_dispatch` workflow.
-- It is typically triggered by `FileUni-WorkSpace/.github/workflows/dispatch-project-release.yml`.
+- It is typically triggered by `FileUni-WorkSpace/.github/workflows/trigger-public-project-release.yml`.
 - If you use npm Trusted Publisher, update the trusted workflow path after this rename from `FileUni-release.yml` to `release-publish.yml`.
 
 ## Mirror Sync

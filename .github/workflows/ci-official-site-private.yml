@@ -1,7 +1,7 @@
 name: Official Site Private CI
 
 # This workflow is dispatched only when changes under OfficialSitePrivate/ are detected
-# by FileUni-WorkSpace/.github/workflows/dispatch-project-ci.yml.
+# by FileUni-WorkSpace/.github/workflows/trigger-public-project-ci.yml.
 
 on:
   workflow_dispatch:
