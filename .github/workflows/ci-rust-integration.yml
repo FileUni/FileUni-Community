@@ -85,8 +85,10 @@ jobs:
           bundle_dir="$PWD/.ci/smoke-bundle"
           mkdir -p "$bundle_dir"
 
-          cargo build --locked -p fileuni --bin fileuni -p fileuni-integration-tests --tests --bins --message-format=json \
+          cargo build --locked -p fileuni --bin fileuni -p fileuni-integration-tests --bin fileuni_e2e_server --message-format=json \
             > "$bundle_dir/build.jsonl"
+          cargo build --locked -p fileuni-integration-tests --tests --message-format=json \
+            >> "$bundle_dir/build.jsonl"
 
           install_compiler_artifact() {
             local target_name="$1"
