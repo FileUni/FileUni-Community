@@ -84,13 +84,12 @@ jobs:
           bundle_dir="$PWD/.ci/smoke-bundle"
           mkdir -p "$bundle_dir"
 
-          cargo build --locked -p fileuni --bin fileuni
+          cargo build --locked -p fileuni --bin fileuni -p fileuni-integration-tests --tests --message-format=json \
+            > "$bundle_dir/build.jsonl"
+
           install -m 755 target/debug/fileuni "$bundle_dir/fileuni"
 
-          cargo test --locked -p fileuni-integration-tests --tests --no-run --message-format=json \
-            > "$bundle_dir/test-build.jsonl"
-
-          jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and (.target.kind[]? == "test") and .executable != null) | [.target.name, .executable] | @tsv' "$bundle_dir/test-build.jsonl" \
+          jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and (.target.kind[]? == "test") and .executable != null) | [.target.name, .executable] | @tsv' "$bundle_dir/build.jsonl" \
             | while IFS=$'\t' read -r test_name executable_path; do
                 install -m 755 "$executable_path" "$bundle_dir/$test_name"
               done
