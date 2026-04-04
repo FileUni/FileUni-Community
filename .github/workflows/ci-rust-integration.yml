@@ -497,7 +497,7 @@ jobs:
   postgres-disconnect-smoke:
     name: postgres-disconnect-smoke
     runs-on: ubuntu-latest
-    needs: ultra-low-resource-basic-smoke
+    needs: low-resource-basic-smoke
     timeout-minutes: 90
     steps:
       - name: Download smoke bundle artifact
@@ -580,141 +580,83 @@ jobs:
             "smoke-bundle/web_api_low_resource_restart_smoke" \
             "smoke-bundle/webdav_low_resource_smoke"
 
+          cat > "smoke-bundle/fileuni-low-resource-wrapper" <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          bundle_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
+          runtime_dir=""
+          prev=""
+          for arg in "$@"; do
+            if [ "$prev" = "--runtime-dir" ]; then
+              runtime_dir="$arg"
+              break
+            fi
+            prev="$arg"
+          done
+
+          if [ -z "$runtime_dir" ]; then
+            printf 'missing --runtime-dir argument for low-resource wrapper\n' >&2
+            exit 64
+          fi
+
+          exec docker run --rm \
+            --network host \
+            --memory=48m \
+            --memory-swap=48m \
+            --cpus=0.25 \
+            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
+            -v "$bundle_dir:/smoke-bundle:ro" \
+            -v "$runtime_dir:$runtime_dir" \
+            ubuntu:24.04 \
+            /smoke-bundle/fileuni "$@"
+          EOF
+
+          chmod +x "smoke-bundle/fileuni-low-resource-wrapper"
+
+          docker pull ubuntu:24.04
+
       - name: Run low-resource Web API smoke
         shell: bash
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni-low-resource-wrapper
+          FILEUNI_TEST_DB_BACKEND: sqlite
+          FILEUNI_TEST_KV_BACKEND: database
+          FILEUNI_DEV_SYNC_OPENAPI: 0
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
         run: |
           set -euo pipefail
 
-          docker run --rm \
-            --memory=64m \
-            --memory-swap=64m \
-            --cpus=0.5 \
-            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
-            -e FILEUNI_TEST_DB_BACKEND=sqlite \
-            -e FILEUNI_TEST_KV_BACKEND=database \
-            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
-            -e RUST_BACKTRACE=1 \
-            -e RUST_TEST_THREADS=1 \
-            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
-            ubuntu:24.04 \
-            /smoke-bundle/web_api_low_resource_smoke --nocapture
+          "smoke-bundle/web_api_low_resource_smoke" --nocapture
 
       - name: Run low-resource WebDAV smoke
         shell: bash
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni-low-resource-wrapper
+          FILEUNI_TEST_DB_BACKEND: sqlite
+          FILEUNI_TEST_KV_BACKEND: database
+          FILEUNI_DEV_SYNC_OPENAPI: 0
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
         run: |
           set -euo pipefail
 
-          docker run --rm \
-            --memory=64m \
-            --memory-swap=64m \
-            --cpus=0.5 \
-            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
-            -e FILEUNI_TEST_DB_BACKEND=sqlite \
-            -e FILEUNI_TEST_KV_BACKEND=database \
-            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
-            -e RUST_BACKTRACE=1 \
-            -e RUST_TEST_THREADS=1 \
-            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
-            ubuntu:24.04 \
-            /smoke-bundle/webdav_low_resource_smoke --nocapture
+          "smoke-bundle/webdav_low_resource_smoke" --nocapture
 
       - name: Run low-resource Web API restart smoke
         shell: bash
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni-low-resource-wrapper
+          FILEUNI_TEST_DB_BACKEND: sqlite
+          FILEUNI_TEST_KV_BACKEND: database
+          FILEUNI_DEV_SYNC_OPENAPI: 0
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
         run: |
           set -euo pipefail
 
-          docker run --rm \
-            --memory=64m \
-            --memory-swap=64m \
-            --cpus=0.5 \
-            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
-            -e FILEUNI_TEST_DB_BACKEND=sqlite \
-            -e FILEUNI_TEST_KV_BACKEND=database \
-            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
-            -e RUST_BACKTRACE=1 \
-            -e RUST_TEST_THREADS=1 \
-            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
-            ubuntu:24.04 \
-            /smoke-bundle/web_api_low_resource_restart_smoke --nocapture
-
-  ultra-low-resource-basic-smoke:
-    name: ultra-low-resource-basic-smoke
-    runs-on: ubuntu-latest
-    needs: low-resource-basic-smoke
-    timeout-minutes: 90
-    steps:
-      - name: Download smoke bundle artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
-          path: smoke-bundle
-
-      - name: Prepare ultra-low-resource smoke bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          chmod +x \
-            "smoke-bundle/fileuni" \
-            "smoke-bundle/web_api_low_resource_smoke" \
-            "smoke-bundle/web_api_low_resource_restart_smoke" \
-            "smoke-bundle/webdav_low_resource_smoke"
-
-      - name: Run ultra-low-resource Web API smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          docker run --rm \
-            --memory=48m \
-            --memory-swap=48m \
-            --cpus=0.25 \
-            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
-            -e FILEUNI_TEST_DB_BACKEND=sqlite \
-            -e FILEUNI_TEST_KV_BACKEND=database \
-            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
-            -e RUST_BACKTRACE=1 \
-            -e RUST_TEST_THREADS=1 \
-            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
-            ubuntu:24.04 \
-            /smoke-bundle/web_api_low_resource_smoke --nocapture
-
-      - name: Run ultra-low-resource WebDAV smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          docker run --rm \
-            --memory=48m \
-            --memory-swap=48m \
-            --cpus=0.25 \
-            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
-            -e FILEUNI_TEST_DB_BACKEND=sqlite \
-            -e FILEUNI_TEST_KV_BACKEND=database \
-            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
-            -e RUST_BACKTRACE=1 \
-            -e RUST_TEST_THREADS=1 \
-            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
-            ubuntu:24.04 \
-            /smoke-bundle/webdav_low_resource_smoke --nocapture
-
-      - name: Run ultra-low-resource Web API restart smoke
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          docker run --rm \
-            --memory=48m \
-            --memory-swap=48m \
-            --cpus=0.25 \
-            -e FILEUNI_TEST_BINARY=/smoke-bundle/fileuni \
-            -e FILEUNI_TEST_DB_BACKEND=sqlite \
-            -e FILEUNI_TEST_KV_BACKEND=database \
-            -e FILEUNI_DEV_SYNC_OPENAPI=0 \
-            -e RUST_BACKTRACE=1 \
-            -e RUST_TEST_THREADS=1 \
-            -v "${GITHUB_WORKSPACE}/smoke-bundle:/smoke-bundle:ro" \
-            ubuntu:24.04 \
-            /smoke-bundle/web_api_low_resource_restart_smoke --nocapture
+          "smoke-bundle/web_api_low_resource_restart_smoke" --nocapture
 
   redis-disconnect-smoke:
     name: redis-disconnect-smoke
