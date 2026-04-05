@@ -2,6 +2,7 @@ local dispatcher = require "luci.dispatcher"
 local fs = require "nixio.fs"
 local http = require "luci.http"
 local i18n = require "fileuni.i18n"
+local openwrt = require "fileuni.openwrt"
 local sys = require "luci.sys"
 local uci = require "luci.model.uci".cursor()
 
@@ -18,6 +19,32 @@ end
 
 local function trim(value)
 	return (value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function format_size(bytes)
+	local size = tonumber(bytes) or 0
+	if size <= 0 then
+		return ""
+	end
+
+	if size >= 1024 * 1024 then
+		return string.format("%.1f MB", size / 1024 / 1024)
+	end
+
+	if size >= 1024 then
+		return string.format("%.1f KB", size / 1024)
+	end
+
+	return string.format("%d B", size)
+end
+
+local function format_timestamp(value)
+	local normalized = trim(value)
+	if normalized == "" then
+		return tr("release_unavailable")
+	end
+
+	return normalized:gsub("T", " "):gsub("Z$", " UTC")
 end
 
 local function parse_server_bind(config_path)
@@ -96,11 +123,62 @@ local function build_language_meta()
 	}
 end
 
+local function build_notice_meta()
+	local message = trim(http.formvalue("fileuni_notice"))
+	if message == "" then
+		return nil
+	end
+
+	local notice_type = trim(http.formvalue("fileuni_notice_type"))
+	if notice_type ~= "error" then
+		notice_type = "success"
+	end
+
+	return {
+		type = notice_type,
+		message = message,
+	}
+end
+
+local function build_release_cards(release_state, arch_state)
+	local cards = {}
+
+	for _, channel in ipairs({ "stable", "prerelease" }) do
+		local release = release_state[channel] or {}
+		local message = ""
+
+		if release_state.fetch_error then
+			message = tr("release_fetch_failed")
+		elseif not arch_state.supported then
+			message = i18n.format(runtime_language, "unsupported_arch_notice", arch_state.machine or "unknown")
+		elseif not release.available then
+			message = tr("release_unavailable")
+		elseif not release.has_matching_asset then
+			message = tr("release_no_matching_asset")
+		end
+
+		cards[#cards + 1] = {
+			channel = channel,
+			channel_label = channel == "stable" and tr("stable_release") or tr("prerelease_release"),
+			version = trim(release.version) ~= "" and release.version or tr("release_unavailable"),
+			published_at = format_timestamp(release.published_at),
+			asset_name = release.asset and release.asset.name or "",
+			asset_size = release.asset and format_size(release.asset.size) or "",
+			details_url = release.html_url or "",
+			install_enabled = release.has_matching_asset == true,
+			message = message,
+		}
+	end
+
+	return {
+		items = cards,
+		fetch_error_message = release_state.fetch_error and tr("release_fetch_failed") or "",
+	}
+end
+
 local function build_backend_meta()
-	local runtime_dir = uci:get("fileuni", "main", "runtime_dir")
-		or uci:get("fileuni", "main", "app_data_dir")
-		or uci:get("fileuni", "main", "config_dir")
-		or default_runtime_dir
+	local runtime_dir = openwrt.runtime_dir(uci)
+	local dashboard = openwrt.dashboard_state(uci)
 	local config_path = runtime_dir .. "/config.toml"
 	local host, port, has_config = parse_server_bind(config_path)
 	local display_host = host or "router-host"
@@ -110,8 +188,6 @@ local function build_backend_meta()
 		or normalized_host == "::"
 		or normalized_host == "127.0.0.1"
 		or normalized_host == "localhost"
-	local running = sys.call("/etc/init.d/fileuni running >/dev/null 2>&1") == 0
-	local binary_exists = fs.access("/usr/bin/fileuni")
 
 	return {
 		runtime_dir = runtime_dir,
@@ -119,26 +195,69 @@ local function build_backend_meta()
 		host = host or "",
 		port = port,
 		has_config = has_config,
-		status_text = running and tr("running") or tr("stopped"),
-		binary_text = binary_exists and tr("installed") or tr("missing"),
-		binary_missing = not binary_exists,
-		binary_missing_notice = tr("binary_missing_notice"),
-		binary_download_url = tr("binary_download_url"),
-		binary_download_link = tr("binary_download_link"),
+		notice = build_notice_meta(),
+		service = {
+			status_text = dashboard.service.running and tr("running") or tr("stopped"),
+			boot_status_text = dashboard.service.boot_enabled and tr("enabled") or tr("disabled"),
+		},
+		binary = {
+			path = dashboard.binary.path,
+			status_text = dashboard.binary.exists and tr("installed") or tr("missing"),
+			version_text = dashboard.binary.version or tr("binary_version_unknown"),
+			package_text = dashboard.binary.package_installed
+				and tr("package_managed")
+				or (dashboard.binary.exists and tr("package_unmanaged") or tr("missing")),
+			removable = dashboard.binary.exists or dashboard.binary.package_installed,
+			missing = not dashboard.binary.exists,
+		},
+		architecture = {
+			text = dashboard.architecture.label,
+			machine = dashboard.architecture.machine,
+			supported = dashboard.architecture.supported,
+		},
+		releases = build_release_cards(dashboard.releases, dashboard.architecture),
+		release_source = dashboard.release_source,
 		backend_hint = use_browser_host
 			and ("http://<router-ip>:" .. port .. "/ui")
 			or ("http://" .. display_host .. ":" .. port .. "/ui"),
 		config_detected_text = has_config and tr("config_detected_yes") or tr("config_detected_no"),
 		admin_reset_hint = i18n.format(runtime_language, "admin_reset_hint", runtime_dir),
+		actions = {
+			service_url = dispatcher.build_url("admin", "services", "fileuni", "service_action"),
+			binary_url = dispatcher.build_url("admin", "services", "fileuni", "binary_action"),
+			refresh_url = dispatcher.build_url("admin", "services", "fileuni"),
+		},
 		labels = {
-			section_title = tr("backend_access"),
+			backend_title = tr("backend_access"),
+			service_controls = tr("service_controls"),
+			service_controls_hint = tr("service_controls_hint"),
 			service_status = tr("service_status"),
+			service_boot_status = tr("service_boot_status"),
 			cli_binary = tr("cli_binary"),
+			binary_path = tr("binary_path"),
+			binary_version = tr("binary_version"),
+			package_state = tr("package_state"),
+			current_architecture = tr("current_architecture"),
 			config_file = tr("config_file"),
 			detected_backend = tr("detected_backend"),
 			config_detected = tr("config_detected"),
 			open_backend = tr("open_backend"),
 			open_backend_hint = tr("open_backend_hint"),
+			start_service = tr("start_service"),
+			stop_service = tr("stop_service"),
+			install_service = tr("install_service"),
+			disable_service = tr("disable_service"),
+			remove_binary = tr("remove_binary"),
+			remove_binary_confirm = tr("remove_binary_confirm"),
+			release_management = tr("release_management"),
+			release_hint = tr("release_hint"),
+			release_source = tr("release_source"),
+			release_refresh = tr("release_refresh"),
+			release_version = tr("release_version"),
+			release_published_at = tr("release_published_at"),
+			release_asset = tr("release_asset"),
+			release_install = tr("release_install"),
+			release_details = tr("release_details"),
 		},
 	}
 end

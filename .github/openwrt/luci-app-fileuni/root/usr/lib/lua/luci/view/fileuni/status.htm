@@ -8,15 +8,12 @@ local language_buttons = language.buttons or {}
 local host = backend.host or ""
 local port = backend.port or "19000"
 local config_path = backend.config_path or "/var/lib/fileuni/config.toml"
-local status_text = backend.status_text or "Unknown"
-local binary_text = backend.binary_text or "Unknown"
-local binary_missing = backend.binary_missing or false
-local binary_missing_notice = backend.binary_missing_notice or ""
-local binary_download_url = backend.binary_download_url or "https://fileuni.com"
-local binary_download_link = backend.binary_download_link or "Download FileUni CLI"
-local backend_hint = backend.backend_hint or ("http://<router-ip>:" .. port .. "/ui")
-local admin_reset_hint = backend.admin_reset_hint or ""
-local config_detected_text = backend.config_detected_text or ""
+local notice = backend.notice or {}
+local service = backend.service or {}
+local binary = backend.binary or {}
+local architecture = backend.architecture or {}
+local releases = backend.releases or {}
+local actions = backend.actions or {}
 %>
 
 <script type="text/javascript">
@@ -33,6 +30,27 @@ local config_detected_text = backend.config_detected_text or ""
 			}
 
 			window.open("http://" + targetHost + ":" + port + "/ui", "_blank", "noopener");
+		};
+
+		window.fileuniSubmitAction = function(url, params, confirmText) {
+			if (confirmText && !window.confirm(confirmText)) {
+				return;
+			}
+
+			var form = document.createElement("form");
+			form.method = "post";
+			form.action = url;
+
+			Object.keys(params || {}).forEach(function(key) {
+				var input = document.createElement("input");
+				input.type = "hidden";
+				input.name = key;
+				input.value = params[key];
+				form.appendChild(input);
+			});
+
+			document.body.appendChild(form);
+			form.submit();
 		};
 	})();
 </script>
@@ -61,43 +79,109 @@ local config_detected_text = backend.config_detected_text or ""
 	</div>
 </div>
 
-<% if binary_missing then %>
-<div class="cbi-section" style="border-left: 3px solid #e74c3c; background: #fdf2f2;">
-	<h3 style="color: #c0392b; margin: 0 0 0.5rem;"><%= pcdata("CLI Binary Required") %></h3>
-	<p style="margin: 0 0 0.75rem; color: #333; line-height: 1.6;"><%= pcdata(binary_missing_notice) %></p>
-	<a href="<%= pcdata(binary_download_url) %>" target="_blank" rel="noopener" class="btn cbi-button cbi-button-apply" style="text-decoration: none;">
-		<%= pcdata(binary_download_link) %>
-	</a>
+<% if notice.message and notice.message ~= "" then %>
+<div class="cbi-section" style="border-left: 3px solid <%= notice.type == 'error' and '#e74c3c' or '#5cb85c' %>; background: <%= notice.type == 'error' and '#fdf2f2' or '#f2fbf2' %>;">
+	<p style="margin: 0; line-height: 1.6;"><%= pcdata(notice.message) %></p>
 </div>
 <% end %>
 
 <div class="cbi-section">
-	<h3><%= pcdata(labels.section_title or "Backend Access") %></h3>
+	<h3><%= pcdata(labels.service_controls or "Service Controls") %></h3>
+	<p style="margin: 0.35rem 0 1rem; color: #666; line-height: 1.6;"><%= pcdata(labels.service_controls_hint or "") %></p>
 	<div class="table">
 		<div class="tr">
 			<div class="td left" width="33%"><%= pcdata(labels.service_status or "Service status") %></div>
-			<div class="td left"><%= pcdata(status_text) %></div>
+			<div class="td left"><%= pcdata(service.status_text or "Unknown") %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.service_boot_status or "Boot status") %></div>
+			<div class="td left"><%= pcdata(service.boot_status_text or "Unknown") %></div>
 		</div>
 		<div class="tr">
 			<div class="td left" width="33%"><%= pcdata(labels.cli_binary or "CLI binary") %></div>
-			<div class="td left"><%= pcdata(binary_text) %></div>
+			<div class="td left"><%= pcdata(binary.status_text or "Unknown") %></div>
 		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.binary_path or "Binary path") %></div>
+			<div class="td left"><%= pcdata(binary.path or "/usr/bin/fileuni") %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.binary_version or "CLI version") %></div>
+			<div class="td left"><%= pcdata(binary.version_text or "Unknown") %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.package_state or "Package state") %></div>
+			<div class="td left"><%= pcdata(binary.package_text or "Unknown") %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.current_architecture or "Current architecture") %></div>
+			<div class="td left"><%= pcdata(architecture.text or "Unknown") %></div>
+		</div>
+	</div>
+	<div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+		<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.start_service or 'Start') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.service_url or "") %>, { action: "start" })' <%= binary.missing and 'disabled="disabled"' or '' %> />
+		<input class="btn cbi-button" type="button" value="<%= pcdata(labels.stop_service or 'Stop') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.service_url or "") %>, { action: "stop" })' />
+		<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.install_service or 'Install Service') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.service_url or "") %>, { action: "install_service" })' <%= binary.missing and 'disabled="disabled"' or '' %> />
+		<input class="btn cbi-button" type="button" value="<%= pcdata(labels.disable_service or 'Disable Service') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.service_url or "") %>, { action: "disable_service" })' />
+		<input class="btn cbi-button cbi-button-negative" type="button" value="<%= pcdata(labels.remove_binary or 'Remove Binary') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.binary_url or "") %>, { action: "remove" }, <%= json.stringify(labels.remove_binary_confirm or "Remove the installed FileUni CLI binary?") %>)' <%= not binary.removable and 'disabled="disabled"' or '' %> />
+	</div>
+</div>
+
+<div class="cbi-section">
+	<h3><%= pcdata(labels.backend_title or "Backend Access") %></h3>
+	<div class="table">
 		<div class="tr">
 			<div class="td left" width="33%"><%= pcdata(labels.config_file or "Config file") %></div>
 			<div class="td left"><%= pcdata(config_path) %></div>
 		</div>
 		<div class="tr">
 			<div class="td left" width="33%"><%= pcdata(labels.detected_backend or "Detected backend") %></div>
-			<div class="td left"><%= pcdata(backend_hint) %></div>
+			<div class="td left"><%= pcdata(backend.backend_hint or ("http://<router-ip>:" .. port .. "/ui")) %></div>
 		</div>
 		<div class="tr">
 			<div class="td left" width="33%"><%= pcdata(labels.config_detected or "Config detected") %></div>
-			<div class="td left"><%= pcdata(config_detected_text) %></div>
+			<div class="td left"><%= pcdata(backend.config_detected_text or "") %></div>
 		</div>
 	</div>
 	<div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
 		<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.open_backend or 'Open Backend') %>" onclick="fileuniOpenBackend()" />
 		<span><%= pcdata(labels.open_backend_hint or "") %></span>
 	</div>
-	<p style="margin-top: 0.75rem;"><%= pcdata(admin_reset_hint) %></p>
+	<p style="margin-top: 0.75rem;"><%= pcdata(backend.admin_reset_hint or "") %></p>
+</div>
+
+<div class="cbi-section">
+	<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+		<div style="min-width: 14rem; flex: 1 1 18rem;">
+			<h3 style="margin: 0;"><%= pcdata(labels.release_management or "Release Management") %></h3>
+			<p style="margin: 0.5rem 0 0; color: #666; line-height: 1.6;"><%= pcdata(labels.release_hint or "") %></p>
+		</div>
+		<div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end;">
+			<a href="<%= pcdata(actions.refresh_url or '#') %>" class="btn cbi-button" style="text-decoration: none;"><%= pcdata(labels.release_refresh or "Refresh") %></a>
+		</div>
+	</div>
+	<div style="margin-top: 0.85rem; color: #666; line-height: 1.6;">
+		<%= pcdata(labels.release_source or "Release source") %>: <a href="<%= pcdata(backend.release_source or 'https://fileuni.com/api/downloads/releases') %>" target="_blank" rel="noopener"><%= pcdata(backend.release_source or "https://fileuni.com/api/downloads/releases") %></a>
+	</div>
+	<div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem;">
+	<% for _, release in ipairs(releases.items or {}) do %>
+		<div style="flex: 1 1 18rem; min-width: 18rem; border: 1px solid #ddd; border-radius: 6px; padding: 1rem; background: #fff;">
+			<h4 style="margin: 0 0 0.75rem;"><%= pcdata(release.channel_label or "Release") %></h4>
+			<div style="line-height: 1.8;">
+				<div><%= pcdata(labels.release_version or "Version") %>: <%= pcdata(release.version or "") %></div>
+				<div><%= pcdata(labels.release_published_at or "Published") %>: <%= pcdata(release.published_at or "") %></div>
+				<div><%= pcdata(labels.release_asset or "Asset") %>: <%= pcdata(release.asset_name ~= "" and release.asset_name or "-") %><% if release.asset_size and release.asset_size ~= "" then %> (<%= pcdata(release.asset_size) %>)<% end %></div>
+			</div>
+			<% if release.message and release.message ~= "" then %>
+			<p style="margin: 0.85rem 0 0; color: #a94442; line-height: 1.6;"><%= pcdata(release.message) %></p>
+			<% end %>
+			<div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+				<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.release_install or 'Install') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.binary_url or "") %>, { action: "install", channel: <%= json.stringify(release.channel or "stable") %> })' <%= not release.install_enabled and 'disabled="disabled"' or '' %> />
+				<% if release.details_url and release.details_url ~= "" then %>
+				<a href="<%= pcdata(release.details_url) %>" target="_blank" rel="noopener" class="btn cbi-button" style="text-decoration: none;"><%= pcdata(labels.release_details or "Details") %></a>
+				<% end %>
+			</div>
+		</div>
+	<% end %>
+	</div>
 </div>

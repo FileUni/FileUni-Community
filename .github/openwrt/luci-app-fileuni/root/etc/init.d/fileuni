@@ -32,7 +32,6 @@ service_triggers() {
 
 start_service() {
 	load_service_config
-	[ "$enabled" -eq 1 ] || return 0
 	[ -x "$PROG" ] || return 1
 
 	ensure_dir "$runtime_dir" || return 1

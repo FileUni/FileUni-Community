@@ -51,8 +51,8 @@ local translations = {
 		fr = "FileUni",
 	},
 	page_description = {
-		en = "Configure the FileUni OpenWrt service, runtime directory, backend shortcut, and built-in language switching.",
-		zh_cn = "配置 FileUni 的 OpenWrt 服务、运行目录、后端快捷入口以及内置语言切换。",
+		en = "Configure the FileUni OpenWrt service, runtime directory, backend shortcut, release install panel, and built-in language switching.",
+		zh_cn = "配置 FileUni 的 OpenWrt 服务、运行目录、后端快捷入口、版本安装面板以及内置语言切换。",
 		ja = "FileUni の OpenWrt サービス、ランタイムディレクトリ、バックエンドショートカット、内蔵言語切替を設定します。",
 		es = "Configura el servicio OpenWrt de FileUni, el directorio de ejecucion, el acceso rapido al backend y el cambio de idioma integrado.",
 		de = "Konfiguriert den OpenWrt-Dienst von FileUni, das Laufzeitverzeichnis, den Backend-Schnellzugriff und die integrierte Sprachumschaltung.",
@@ -177,6 +177,182 @@ local translations = {
 		es = "Esto abre la interfaz web de FileUni en una pestana nueva usando el puerto leido desde `config.toml`.",
 		de = "Dies oeffnet die FileUni-Weboberflaeche in einem neuen Tab mit dem aus `config.toml` gelesenen Port.",
 		fr = "Cela ouvre l'interface web FileUni dans un nouvel onglet avec le port lu depuis `config.toml`.",
+	},
+	service_controls = {
+		en = "Service Controls",
+		zh_cn = "服务控制",
+	},
+	service_controls_hint = {
+		en = "These buttons use the saved configuration in `/etc/config/fileuni`. Click Save & Apply after editing the fields below.",
+		zh_cn = "这些按钮使用 `/etc/config/fileuni` 里已经保存的配置。修改下面的字段后，请先点击保存并应用。",
+	},
+	service_boot_status = {
+		en = "Boot status",
+		zh_cn = "开机状态",
+	},
+	enabled = {
+		en = "Enabled",
+		zh_cn = "已启用",
+	},
+	disabled = {
+		en = "Disabled",
+		zh_cn = "已禁用",
+	},
+	binary_path = {
+		en = "Binary path",
+		zh_cn = "二进制路径",
+	},
+	binary_version = {
+		en = "CLI version",
+		zh_cn = "CLI 版本",
+	},
+	binary_version_unknown = {
+		en = "Unknown",
+		zh_cn = "未知",
+	},
+	package_state = {
+		en = "Package state",
+		zh_cn = "包状态",
+	},
+	package_managed = {
+		en = "Managed by opkg",
+		zh_cn = "由 opkg 管理",
+	},
+	package_unmanaged = {
+		en = "Binary only",
+		zh_cn = "仅二进制文件",
+	},
+	current_architecture = {
+		en = "Current architecture",
+		zh_cn = "当前架构",
+	},
+	start_service = {
+		en = "Start",
+		zh_cn = "启动",
+	},
+	stop_service = {
+		en = "Stop",
+		zh_cn = "停止",
+	},
+	install_service = {
+		en = "Install Service",
+		zh_cn = "安装为服务",
+	},
+	disable_service = {
+		en = "Disable Service",
+		zh_cn = "禁用服务",
+	},
+	remove_binary = {
+		en = "Remove Binary",
+		zh_cn = "删除二进制",
+	},
+	remove_binary_confirm = {
+		en = "Remove the installed FileUni CLI binary now?",
+		zh_cn = "现在删除已安装的 FileUni CLI 二进制吗？",
+	},
+	release_management = {
+		en = "Release Management",
+		zh_cn = "版本管理",
+	},
+	release_hint = {
+		en = "The latest stable and prerelease versions are read from fileuni.com. Install downloads the matching OpenWrt CLI package and places `fileuni` under `/usr/bin` through `opkg`.",
+		zh_cn = "这里会从 fileuni.com 读取最新稳定版和预发布版。安装操作会下载适合当前 OpenWrt 架构的 CLI 包，并通过 `opkg` 把 `fileuni` 放到 `/usr/bin`。",
+	},
+	release_source = {
+		en = "Release source",
+		zh_cn = "版本来源",
+	},
+	release_refresh = {
+		en = "Refresh",
+		zh_cn = "刷新",
+	},
+	stable_release = {
+		en = "Stable",
+		zh_cn = "稳定版",
+	},
+	prerelease_release = {
+		en = "Prerelease",
+		zh_cn = "预发布版",
+	},
+	release_version = {
+		en = "Version",
+		zh_cn = "版本",
+	},
+	release_published_at = {
+		en = "Published",
+		zh_cn = "发布时间",
+	},
+	release_asset = {
+		en = "Asset",
+		zh_cn = "资源包",
+	},
+	release_install = {
+		en = "Install",
+		zh_cn = "安装",
+	},
+	release_details = {
+		en = "Details",
+		zh_cn = "详情",
+	},
+	release_unavailable = {
+		en = "Unavailable",
+		zh_cn = "不可用",
+	},
+	release_no_matching_asset = {
+		en = "No matching OpenWrt CLI package is published for this router on the selected channel.",
+		zh_cn = "所选通道里没有适合这台路由器的 OpenWrt CLI 包。",
+	},
+	release_fetch_failed = {
+		en = "Failed to query the latest release list from fileuni.com.",
+		zh_cn = "从 fileuni.com 查询最新版本列表失败。",
+	},
+	service_script_missing = {
+		en = "The FileUni OpenWrt service wrapper is missing.",
+		zh_cn = "缺少 FileUni 的 OpenWrt 服务包装脚本。",
+	},
+	unsupported_arch_notice = {
+		en = "The current router architecture `%s` is not supported by published FileUni OpenWrt CLI packages.",
+		zh_cn = "当前路由器架构 `%s` 还没有对应的 FileUni OpenWrt CLI 包。",
+	},
+	service_started_success = {
+		en = "FileUni service started.",
+		zh_cn = "FileUni 服务已启动。",
+	},
+	service_stopped_success = {
+		en = "FileUni service stopped.",
+		zh_cn = "FileUni 服务已停止。",
+	},
+	service_installed_success = {
+		en = "FileUni has been enabled as an OpenWrt service and started.",
+		zh_cn = "FileUni 已安装为 OpenWrt 服务并启动。",
+	},
+	service_disabled_success = {
+		en = "FileUni OpenWrt service disabled.",
+		zh_cn = "FileUni OpenWrt 服务已禁用。",
+	},
+	binary_installed_success = {
+		en = "Installed FileUni CLI %s.",
+		zh_cn = "已安装 FileUni CLI %s。",
+	},
+	binary_removed_success = {
+		en = "Removed the installed FileUni CLI binary.",
+		zh_cn = "已删除已安装的 FileUni CLI 二进制。",
+	},
+	invalid_action = {
+		en = "Invalid action.",
+		zh_cn = "无效操作。",
+	},
+	invalid_channel = {
+		en = "Invalid release channel.",
+		zh_cn = "无效的版本通道。",
+	},
+	operation_failed = {
+		en = "Operation failed",
+		zh_cn = "操作失败",
+	},
+	operation_completed = {
+		en = "Operation completed.",
+		zh_cn = "操作已完成。",
 	},
 	admin_reset_hint = {
 		en = "If the admin password is lost, delete `%s/install.lock` and restart FileUni to enter the setup wizard again.",
