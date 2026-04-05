@@ -56,7 +56,7 @@ jobs:
           path: |
             ~/.bun/install/cache
             workspace/frontends/node_modules
-          key: rust-ci-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          key: rust-ci-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock', 'workspace/ts_shared/package.json', 'workspace/ts_shared/i18n-core/**', 'workspace/ts_shared/opencc-js.d.ts') }}
           restore-keys: |
             rust-ci-bun-${{ runner.os }}-
 
