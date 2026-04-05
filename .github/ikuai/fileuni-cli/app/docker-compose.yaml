@@ -1,0 +1,31 @@
+services:
+  fileuni-cli:
+    image: fileuni-cli:ikuai
+    container_name: fileuni-cli-${NAME_NONCE}
+    deploy:
+      resources:
+        limits:
+          cpus: ${CPUS_LIMIT}
+          memory: ${MEMORY_LIMIT}
+    restart: ${RESTART}
+    ports:
+      - ${HOST_IP}:${APP_PORT_WEB}:19000
+    volumes:
+      - ./data/fileuni:/var/lib/fileuni
+    env_file:
+      - ./environment
+    command: ["--runtime-dir", "/var/lib/fileuni"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - doc_app_default
+    labels:
+      createdBy: "FileUni"
+
+networks:
+  doc_app_default:
+    external: true
+    name: doc_app_default

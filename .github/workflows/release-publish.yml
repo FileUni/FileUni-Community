@@ -1636,6 +1636,34 @@ jobs:
 
           ls -la packages/
 
+      - name: Setup QEMU for iKuai app package
+        if: ${{ contains(fromJSON('["x86_64-unknown-linux-musl","i686-unknown-linux-musl","aarch64-unknown-linux-musl","armv7-unknown-linux-musleabihf"]'), matrix.target) }}
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Docker Buildx for iKuai app package
+        if: ${{ contains(fromJSON('["x86_64-unknown-linux-musl","i686-unknown-linux-musl","aarch64-unknown-linux-musl","armv7-unknown-linux-musleabihf"]'), matrix.target) }}
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build iKuai app package
+        if: ${{ contains(fromJSON('["x86_64-unknown-linux-musl","i686-unknown-linux-musl","aarch64-unknown-linux-musl","armv7-unknown-linux-musleabihf"]'), matrix.target) }}
+        env:
+          VERSION: ${{ needs.resolve-matrix.outputs.publish_version }}
+        run: |
+          set -euo pipefail
+
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          ikuai_base="$(fileuni_cli_base "${{ matrix.target }}" ikuai)"
+
+          bash .github/scripts/build-ikuai-app-package.sh \
+            "${{ github.workspace }}" \
+            "./packages" \
+            "${VERSION}" \
+            "${{ matrix.target }}" \
+            "./binary/fileuni" \
+            "${ikuai_base}"
+
+          ls -la packages/
+
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:

@@ -1,0 +1,15 @@
+[
+  {
+    "default": 19000,
+    "min": 1,
+    "max": 65535,
+    "attrname": "APP_PORT_WEB",
+    "label": {
+      "en": "Web Port",
+      "zh": "Web 端口"
+    },
+    "required": true,
+    "scope": "config",
+    "type": "integer"
+  }
+]

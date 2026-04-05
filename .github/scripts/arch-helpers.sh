@@ -131,6 +131,9 @@ fileuni_cli_base() {
     openwrt)
       fileuni_build_base "cli" "${arch}" "openwrt" "musl"
       ;;
+    ikuai)
+      fileuni_build_base "cli" "${arch}" "ikuai" "ipkg"
+      ;;
     *)
       printf 'Unknown cli base variant: %s\n' "${variant}" >&2
       return 1
@@ -146,6 +149,33 @@ fileuni_is_openwrt_cli_target() {
       return 0
       ;;
     *)
+      return 1
+      ;;
+  esac
+}
+
+fileuni_is_ikuai_cli_target() {
+  fileuni_is_openwrt_cli_target "$@"
+}
+
+fileuni_docker_platform() {
+  local target="${1:-}"
+
+  case "${target}" in
+    x86_64-unknown-linux-musl)
+      printf '%s\n' "linux/amd64"
+      ;;
+    i686-unknown-linux-musl)
+      printf '%s\n' "linux/386"
+      ;;
+    aarch64-unknown-linux-musl)
+      printf '%s\n' "linux/arm64"
+      ;;
+    armv7-unknown-linux-musleabihf)
+      printf '%s\n' "linux/arm/v7"
+      ;;
+    *)
+      printf 'Unsupported Docker target: %s\n' "${target}" >&2
       return 1
       ;;
   esac

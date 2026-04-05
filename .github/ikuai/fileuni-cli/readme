@@ -1,0 +1,13 @@
+FileUni CLI for iKuai v4 App Store local installation.
+
+Highlights:
+- Upload the matching `.ipkg` package in Applications -> App Store -> Local installation.
+- Uses a dedicated runtime volume so your FileUni data persists across restarts.
+- Opens the regular FileUni setup flow on first launch.
+
+How to use:
+1. Pick the `.ipkg` package that matches your iKuai CPU architecture.
+2. Upload it in the iKuai Web UI and keep the default runtime volume path.
+3. Open `http://<ikuai-ip>:<mapped-port>` to finish FileUni setup.
+
+Project: https://github.com/FileUni/FileUni-Project

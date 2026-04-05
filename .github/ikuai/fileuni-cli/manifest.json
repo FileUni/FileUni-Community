@@ -1,0 +1,17 @@
+{
+  "name": "fileuni-cli",
+  "version": "__FILEUNI_VERSION__",
+  "display_name": "FileUni CLI",
+  "image": "fileuni-cli:ikuai",
+  "description": "FileUni server package for iKuai v4 App Store local installation.",
+  "type": "1",
+  "maintainer": "FileUni Team",
+  "maintainer_url": "https://github.com/FileUni/FileUni-Project",
+  "distributor": "FileUni Team",
+  "distributor_url": "https://github.com/FileUni/FileUni-Project",
+  "requirements": {
+    "memory": "256MB",
+    "storage": "80MB",
+    "os_min_version": "4.0.0"
+  }
+}
