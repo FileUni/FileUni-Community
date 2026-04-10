@@ -72,6 +72,7 @@ jobs:
       dist_tag: ${{ steps.meta.outputs.dist_tag }}
       pkg_version: ${{ steps.meta.outputs.pkg_version }}
       publish_version: ${{ steps.meta.outputs.publish_version }}
+      npm_publish_version: ${{ steps.meta.outputs.npm_publish_version }}
       build_mode: ${{ steps.matrix.outputs.build_mode }}
       cli_cargo_dist: ${{ steps.matrix.outputs.cli_cargo_dist }}
       cli_cross: ${{ steps.matrix.outputs.cli_cross }}
@@ -132,15 +133,22 @@ jobs:
           pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fileuni") | .version')"
           release_timestamp=""
           publish_version="${pkg_version}"
+          npm_publish_version="${pkg_version}"
           if [ "${prerelease_input}" = "true" ] || [[ "${pkg_version}" == *-* ]]; then
             release_timestamp="$(TZ=Asia/Shanghai date '+%Y%m%d%H%M%S')"
             publish_version="${pkg_version}.${release_timestamp}"
+            if [[ "${pkg_version}" == *-* ]]; then
+              npm_publish_version="${pkg_version}.${release_timestamp}"
+            else
+              npm_publish_version="${pkg_version}-nightly.${release_timestamp}"
+            fi
           fi
 
           echo "dist_tag=v${pkg_version}" >> "$GITHUB_OUTPUT"
           echo "pkg_version=${pkg_version}" >> "$GITHUB_OUTPUT"
           echo "release_timestamp=${release_timestamp}" >> "$GITHUB_OUTPUT"
           echo "publish_version=${publish_version}" >> "$GITHUB_OUTPUT"
+          echo "npm_publish_version=${npm_publish_version}" >> "$GITHUB_OUTPUT"
 
           if [ -n "${release_name_input}" ]; then
             release_tag="${release_name_input}"
@@ -168,7 +176,7 @@ jobs:
           fi
 
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
-          echo "::notice::dist_tag=v${pkg_version}  pkg_version=${pkg_version}  publish_version=${publish_version}  release_tag=${release_tag}  ref=${ref}  workspace_sha=${workspace_sha}  trigger_mode=${trigger_mode:-manual}"
+          echo "::notice::dist_tag=v${pkg_version}  pkg_version=${pkg_version}  publish_version=${publish_version}  npm_publish_version=${npm_publish_version}  release_tag=${release_tag}  ref=${ref}  workspace_sha=${workspace_sha}  trigger_mode=${trigger_mode:-manual}"
 
       - name: Resolve build matrix
         id: matrix
@@ -1955,13 +1963,18 @@ jobs:
       - name: Resolve npm publish metadata
         shell: bash
         env:
-          PKG_VERSION: ${{ needs.resolve-matrix.outputs.publish_version }}
+          PKG_VERSION: ${{ needs.resolve-matrix.outputs.npm_publish_version }}
+          TRIGGER_MODE: ${{ github.event.inputs.trigger_mode }}
         run: |
           set -euo pipefail
 
           resolve_npm_channel() {
             local version="$1"
+            local trigger_mode="$2"
             local npm_tag="latest"
+            if [ "${trigger_mode:-manual}" != "tag" ]; then
+              npm_tag="next"
+            fi
             if [[ "${version}" == *-* ]]; then
               local prerelease="${version#*-}"
               prerelease="${prerelease%%.*}"
@@ -1973,7 +1986,7 @@ jobs:
             printf '%s' "${npm_tag}"
           }
 
-          cli_npm_tag="$(resolve_npm_channel "${PKG_VERSION}")"
+          cli_npm_tag="$(resolve_npm_channel "${PKG_VERSION}" "${TRIGGER_MODE}")"
           gui_pkg_version="${PKG_VERSION}-gui.0"
           gui_npm_tag="gui"
           if [[ "${PKG_VERSION}" == *-* ]]; then
@@ -1989,7 +2002,7 @@ jobs:
       - name: Build npm packages
         shell: bash
         env:
-          PKG_VERSION: ${{ needs.resolve-matrix.outputs.publish_version }}
+          PKG_VERSION: ${{ needs.resolve-matrix.outputs.npm_publish_version }}
           RELEASE_TAG: ${{ needs.resolve-matrix.outputs.release_tag }}
         run: |
           set -euo pipefail
@@ -2024,7 +2037,7 @@ jobs:
       - name: Publish npm packages
         shell: bash
         env:
-          PKG_VERSION: ${{ needs.resolve-matrix.outputs.publish_version }}
+          PKG_VERSION: ${{ needs.resolve-matrix.outputs.npm_publish_version }}
         run: |
           set -euo pipefail
 
