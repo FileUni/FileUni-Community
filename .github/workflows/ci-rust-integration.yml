@@ -162,6 +162,40 @@ jobs:
           done
           test -x "$bundle_dir/fileuni_e2e_server"
 
+      - name: Verify embedded frontend entry
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bundle_dir="$PWD/.ci/smoke-bundle"
+          log_path="$bundle_dir/frontend-entry-verify.log"
+          "$bundle_dir/fileuni_e2e_server" --port 4011 >"$log_path" 2>&1 &
+          server_pid=$!
+
+          cleanup() {
+            kill "$server_pid" >/dev/null 2>&1 || true
+            wait "$server_pid" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          for _ in $(seq 1 60); do
+            if curl -fsS "http://127.0.0.1:4011/api/v1/ping" >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          root_html="$(curl -fsS "http://127.0.0.1:4011/")"
+          case "$root_html" in
+            *"<html"*|*"<!doctype html"*|*"<!DOCTYPE html"*)
+              ;;
+            *)
+              printf '%s\n' "$root_html"
+              exit 1
+              ;;
+          esac
+
       - name: Upload smoke bundle artifact
         uses: actions/upload-artifact@v4
         with:
@@ -482,7 +516,7 @@ jobs:
         working-directory: workspace/apps/integration-tests/e2e
         run: |
           bun install --frozen-lockfile
-          bunx playwright install --with-deps chromium
+          bunx playwright install chromium
 
       - name: Run web UI E2E test
         working-directory: workspace/apps/integration-tests/e2e
@@ -494,7 +528,17 @@ jobs:
           chmod +x "${GITHUB_WORKSPACE}/smoke-bundle/fileuni" "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_e2e_server"
           bun run test
 
+      - name: Upload web UI E2E step screenshots
+        id: upload-webui-e2e-step-screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webui-e2e-step-screenshots
+          path: workspace/apps/integration-tests/e2e/test-results/**/*.png
+          if-no-files-found: warn
+
       - name: Upload Playwright artifacts
+        id: upload-webui-e2e-playwright-artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -503,6 +547,28 @@ jobs:
             workspace/apps/integration-tests/e2e/test-results/
             workspace/apps/integration-tests/e2e/playwright-report/
           if-no-files-found: warn
+
+      - name: Summarize web UI E2E artifacts
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          {
+            printf '## Web UI E2E artifacts\n\n'
+            if [ -n "${{ steps.upload-webui-e2e-step-screenshots.outputs.artifact-id }}" ]; then
+              printf -- '- Step screenshots: https://github.com/%s/actions/runs/%s/artifacts/%s\n' \
+                "${{ github.repository }}" \
+                "${{ github.run_id }}" \
+                "${{ steps.upload-webui-e2e-step-screenshots.outputs.artifact-id }}"
+            fi
+            if [ -n "${{ steps.upload-webui-e2e-playwright-artifacts.outputs.artifact-id }}" ]; then
+              printf -- '- Full Playwright report and raw results: https://github.com/%s/actions/runs/%s/artifacts/%s\n' \
+                "${{ github.repository }}" \
+                "${{ github.run_id }}" \
+                "${{ steps.upload-webui-e2e-playwright-artifacts.outputs.artifact-id }}"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   postgres-disconnect-smoke:
     name: postgres-disconnect-smoke
