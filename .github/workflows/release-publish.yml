@@ -1083,6 +1083,11 @@ jobs:
         with:
           tool: tauri-cli@2
 
+      - name: Generate GUI mobile icons
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: cargo tauri icon "icons/icon.png" -o "icons"
+
       - name: Sync GUI version (Tauri)
         working-directory: workspace/apps/gui
         shell: bash
@@ -1110,26 +1115,101 @@ jobs:
           p = Path("tauri.conf.json")
           cfg = json.loads(p.read_text(encoding="utf-8"))
           cfg["version"] = version
+          base_bundle = cfg.setdefault("bundle", {})
+          icon_candidates = [
+              "icons/32x32.png",
+              "icons/128x128.png",
+              "icons/128x128@2x.png",
+              "icons/icon.ico",
+              "icons/icon.icns",
+          ]
+          resolved_icons = [path for path in icon_candidates if Path(path).exists()]
+          if resolved_icons:
+              base_bundle["icon"] = resolved_icons
+          base_android_bundle = base_bundle.setdefault("android", {})
+          base_android_bundle["versionCode"] = version_code
           p.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
           print(f"tauri.conf.json version -> {version}")
 
           android_p = Path("tauri.android.conf.json")
           if android_p.exists():
               android_cfg = json.loads(android_p.read_text(encoding="utf-8"))
+              android_cfg["version"] = version
               bundle = android_cfg.setdefault("bundle", {})
+              if resolved_icons:
+                  bundle["icon"] = resolved_icons
               android_bundle = bundle.setdefault("android", {})
               android_bundle["versionCode"] = version_code
               android_p.write_text(json.dumps(android_cfg, indent=2) + "\n", encoding="utf-8")
-              print(f"tauri.android.conf.json versionCode -> {version_code} (GITHUB_RUN_NUMBER={run_number})")
+              print(
+                  f"tauri.android.conf.json version -> {version}; versionCode -> {version_code} "
+                  f"(GITHUB_RUN_NUMBER={run_number})"
+              )
+
+          github_env = os.environ.get("GITHUB_ENV")
+          if github_env:
+              with open(github_env, "a", encoding="utf-8") as fh:
+                  fh.write(f"FILEUNI_GUI_MOBILE_VERSION={version}\n")
+                  fh.write(f"FILEUNI_GUI_ANDROID_VERSION_CODE={version_code}\n")
           PY
 
-      - name: Initialize Android project if missing
+      - name: Recreate Android project (deterministic)
         working-directory: workspace/apps/gui
         shell: bash
         run: |
-          if [ ! -d "gen/android" ]; then
-            cargo tauri android init --ci
-          fi
+          set -euo pipefail
+          rm -rf gen/android
+          cargo tauri android init --ci
+
+      - name: Patch Android mobile project assets
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          import shutil
+          from pathlib import Path
+
+          version = os.environ["FILEUNI_GUI_MOBILE_VERSION"]
+          version_code = os.environ["FILEUNI_GUI_ANDROID_VERSION_CODE"]
+          root = Path(".")
+          icon_source = root / "icons" / "android"
+          res_target = root / "gen" / "android" / "app" / "src" / "main" / "res"
+
+          if not icon_source.is_dir():
+              raise SystemExit(f"Missing generated Android icons: {icon_source}")
+          if not res_target.is_dir():
+              raise SystemExit(f"Missing Android resource directory: {res_target}")
+
+          for entry in icon_source.iterdir():
+              target = res_target / entry.name
+              if target.exists():
+                  if target.is_dir():
+                      shutil.rmtree(target)
+                  else:
+                      target.unlink()
+              if entry.is_dir():
+                  shutil.copytree(entry, target)
+              else:
+                  shutil.copy2(entry, target)
+
+          gradle_files = [
+              root / "gen" / "android" / "app" / "build.gradle.kts",
+              root / "gen" / "android" / "app" / "build.gradle",
+          ]
+          for gradle_file in gradle_files:
+              if not gradle_file.exists():
+                  continue
+              original = gradle_file.read_text(encoding="utf-8")
+              updated = re.sub(r'versionName\s*=\s*"[^"]*"', f'versionName = "{version}"', original)
+              updated = re.sub(r'versionName\s+"[^"]*"', f'versionName "{version}"', updated)
+              updated = re.sub(r'versionCode\s*=\s*\d+', f'versionCode = {version_code}', updated)
+              updated = re.sub(r'versionCode\s+\d+', f'versionCode {version_code}', updated)
+              if updated != original:
+                  gradle_file.write_text(updated, encoding="utf-8")
+          PY
 
       - name: Build Android APK
         working-directory: workspace/apps/gui
@@ -1280,20 +1360,71 @@ jobs:
         with:
           tool: tauri-cli@2
 
+      - name: Generate GUI mobile icons
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: cargo tauri icon "icons/icon.png" -o "icons"
+
       - name: Sync GUI version (Tauri)
         working-directory: workspace/apps/gui
         shell: bash
         run: |
           python3 - <<'PY'
           import json
+          import os
           from pathlib import Path
 
           version = "${{ needs.resolve-matrix.outputs.pkg_version }}"
+          run_number_raw = os.environ.get("GITHUB_RUN_NUMBER", "")
+          if not run_number_raw.isdigit():
+              raise SystemExit(f"Missing/invalid GITHUB_RUN_NUMBER: {run_number_raw!r}")
+          run_number = int(run_number_raw)
+          base = 1_000_000_000
+          version_code = base + run_number
+          if version_code > 2_100_000_000:
+              raise SystemExit(
+                  f"iOS bundleVersion overflow: {version_code} (base={base} run_number={run_number})"
+              )
+
           p = Path("tauri.conf.json")
           cfg = json.loads(p.read_text(encoding="utf-8"))
           cfg["version"] = version
+          base_bundle = cfg.setdefault("bundle", {})
+          icon_candidates = [
+              "icons/32x32.png",
+              "icons/128x128.png",
+              "icons/128x128@2x.png",
+              "icons/icon.ico",
+              "icons/icon.icns",
+          ]
+          resolved_icons = [path for path in icon_candidates if Path(path).exists()]
+          if resolved_icons:
+              base_bundle["icon"] = resolved_icons
+          base_ios_bundle = base_bundle.setdefault("iOS", {})
+          base_ios_bundle["bundleVersion"] = str(version_code)
           p.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
           print(f"tauri.conf.json version -> {version}")
+
+          ios_p = Path("tauri.ios.conf.json")
+          if ios_p.exists():
+              ios_cfg = json.loads(ios_p.read_text(encoding="utf-8"))
+              ios_cfg["version"] = version
+              bundle = ios_cfg.setdefault("bundle", {})
+              if resolved_icons:
+                  bundle["icon"] = resolved_icons
+              ios_bundle = bundle.setdefault("iOS", {})
+              ios_bundle["bundleVersion"] = str(version_code)
+              ios_p.write_text(json.dumps(ios_cfg, indent=2) + "\n", encoding="utf-8")
+              print(
+                  f"tauri.ios.conf.json version -> {version}; bundleVersion -> {version_code} "
+                  f"(GITHUB_RUN_NUMBER={run_number})"
+              )
+
+          github_env = os.environ.get("GITHUB_ENV")
+          if github_env:
+              with open(github_env, "a", encoding="utf-8") as fh:
+                  fh.write(f"FILEUNI_GUI_MOBILE_VERSION={version}\n")
+                  fh.write(f"FILEUNI_GUI_IOS_BUNDLE_VERSION={version_code}\n")
           PY
 
       - name: Recreate iOS project (deterministic)
@@ -1304,6 +1435,65 @@ jobs:
           cargo tauri -V
           rm -rf gen/apple
           cargo tauri ios init --ci
+
+      - name: Patch iOS mobile project assets
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+          import shutil
+          from pathlib import Path
+
+          version = os.environ["FILEUNI_GUI_MOBILE_VERSION"]
+          bundle_version = os.environ["FILEUNI_GUI_IOS_BUNDLE_VERSION"]
+          root = Path(".")
+          icon_source = root / "icons" / "ios"
+          apple_root = root / "gen" / "apple"
+
+          if not icon_source.is_dir():
+              raise SystemExit(f"Missing generated iOS icons: {icon_source}")
+          if not apple_root.is_dir():
+              raise SystemExit(f"Missing generated Apple project directory: {apple_root}")
+
+          for entry in apple_root.iterdir():
+              if not entry.is_dir():
+                  continue
+              app_icon = entry / "Assets.xcassets" / "AppIcon.appiconset"
+              if app_icon.parent.is_dir():
+                  if app_icon.exists():
+                      shutil.rmtree(app_icon)
+                  app_icon.mkdir(parents=True, exist_ok=True)
+                  for source in icon_source.iterdir():
+                      target = app_icon / source.name
+                      if source.is_dir():
+                          shutil.copytree(source, target)
+                      else:
+                          shutil.copy2(source, target)
+
+          info_plist_source = root / "Info.ios.plist"
+          if info_plist_source.is_file():
+              for entry in apple_root.iterdir():
+                  if not entry.is_dir():
+                      continue
+                  plist_target = entry / "Info.ios.plist"
+                  if plist_target.parent.is_dir():
+                      shutil.copy2(info_plist_source, plist_target)
+
+          pbxproj = apple_root / "fileuni-gui.xcodeproj" / "project.pbxproj"
+          if pbxproj.is_file():
+              original = pbxproj.read_text(encoding="utf-8")
+              updated = re.sub(r"MARKETING_VERSION = [^;]*;", f"MARKETING_VERSION = {version};", original)
+              updated = re.sub(
+                  r"CURRENT_PROJECT_VERSION = [^;]*;",
+                  f"CURRENT_PROJECT_VERSION = {bundle_version};",
+                  updated,
+              )
+              if updated != original:
+                  pbxproj.write_text(updated, encoding="utf-8")
+          PY
 
       - name: Ensure Xcode Tauri bridge script exists
         working-directory: workspace/apps/gui
