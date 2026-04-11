@@ -1116,16 +1116,6 @@ jobs:
           cfg = json.loads(p.read_text(encoding="utf-8"))
           cfg["version"] = version
           base_bundle = cfg.setdefault("bundle", {})
-          icon_candidates = [
-              "icons/32x32.png",
-              "icons/128x128.png",
-              "icons/128x128@2x.png",
-              "icons/icon.ico",
-              "icons/icon.icns",
-          ]
-          resolved_icons = [path for path in icon_candidates if Path(path).exists()]
-          if resolved_icons:
-              base_bundle["icon"] = resolved_icons
           base_android_bundle = base_bundle.setdefault("android", {})
           base_android_bundle["versionCode"] = version_code
           p.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
@@ -1136,8 +1126,6 @@ jobs:
               android_cfg = json.loads(android_p.read_text(encoding="utf-8"))
               android_cfg["version"] = version
               bundle = android_cfg.setdefault("bundle", {})
-              if resolved_icons:
-                  bundle["icon"] = resolved_icons
               android_bundle = bundle.setdefault("android", {})
               android_bundle["versionCode"] = version_code
               android_p.write_text(json.dumps(android_cfg, indent=2) + "\n", encoding="utf-8")
@@ -1423,16 +1411,6 @@ jobs:
           cfg = json.loads(p.read_text(encoding="utf-8"))
           cfg["version"] = version
           base_bundle = cfg.setdefault("bundle", {})
-          icon_candidates = [
-              "icons/32x32.png",
-              "icons/128x128.png",
-              "icons/128x128@2x.png",
-              "icons/icon.ico",
-              "icons/icon.icns",
-          ]
-          resolved_icons = [path for path in icon_candidates if Path(path).exists()]
-          if resolved_icons:
-              base_bundle["icon"] = resolved_icons
           base_ios_bundle = base_bundle.setdefault("iOS", {})
           base_ios_bundle["bundleVersion"] = str(version_code)
           p.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
@@ -1443,8 +1421,6 @@ jobs:
               ios_cfg = json.loads(ios_p.read_text(encoding="utf-8"))
               ios_cfg["version"] = version
               bundle = ios_cfg.setdefault("bundle", {})
-              if resolved_icons:
-                  bundle["icon"] = resolved_icons
               ios_bundle = bundle.setdefault("iOS", {})
               ios_bundle["bundleVersion"] = str(version_code)
               ios_p.write_text(json.dumps(ios_cfg, indent=2) + "\n", encoding="utf-8")

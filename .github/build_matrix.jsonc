@@ -21,7 +21,6 @@
       { "target": "i686-unknown-linux-musl",         "nfpm_arch": "386",     "mode": ["full"] },
       { "target": "aarch64-unknown-linux-musl",    "nfpm_arch": "arm64",   "mode": ["full"] },
       { "target": "armv7-unknown-linux-musleabihf", "nfpm_arch": "armhf",   "mode": ["full"] },
-      { "target": "arm-unknown-linux-gnueabi",      "nfpm_arch": "armel",   "mode": ["full"] },
       { "target": "riscv64gc-unknown-linux-gnu",    "nfpm_arch": "riscv64", "mode": ["full"] },
       { "target": "powerpc64le-unknown-linux-gnu",  "nfpm_arch": "ppc64le", "mode": ["full"] }
     ],
