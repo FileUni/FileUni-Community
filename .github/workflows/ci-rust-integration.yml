@@ -158,7 +158,8 @@ jobs:
             ftp_smoke \
             mail_docker_smoke \
             remote_mount_timeout_smoke \
-            remote_mount_rclone_smoke
+            remote_mount_rclone_smoke \
+            domain_acme_ddns_real_cloudflare_zerossl_smoke
           do
             test -x "$bundle_dir/$test_name"
           done
@@ -287,6 +288,38 @@ jobs:
 
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
           "smoke-bundle/${{ matrix.test_name }}" --nocapture
+
+  real-domain-smoke:
+    name: real-domain-cloudflare-zerossl-smoke
+    runs-on: ubuntu-latest
+    needs: prepare-smoke-bundle
+    timeout-minutes: 180
+    steps:
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
+
+      - name: Run real domain smoke test
+        shell: bash
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_RUN_REAL_DOMAIN_TESTS: 1
+          TOKEN_CF: ${{ secrets.TOKEN_CF }}
+          TOKEN_ZEROSS_EAB_KID: ${{ secrets.TOKEN_ZEROSS_EAB_KID }}
+          TOKEN_ZEROSS_EAB_KEY: ${{ secrets.TOKEN_ZEROSS_EAB_KEY }}
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: |
+          set -euo pipefail
+
+          test -n "${TOKEN_CF:-}"
+          test -n "${TOKEN_ZEROSS_EAB_KID:-}"
+          test -n "${TOKEN_ZEROSS_EAB_KEY:-}"
+
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke"
+          "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke" --ignored --nocapture
 
   postgres-smoke:
     name: ${{ matrix.job_name }}
