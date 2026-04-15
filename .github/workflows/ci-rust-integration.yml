@@ -138,6 +138,7 @@ jobs:
             service_manager_smoke \
             web_api_frontend_contract_smoke \
             web_api_postgres_contract_smoke \
+            archive_wal_amplification_smoke \
             web_api_low_resource_smoke \
             web_api_low_resource_restart_smoke \
             web_api_boundary_smoke \
@@ -244,6 +245,8 @@ jobs:
             test_name: web_api_frontend_contract_smoke
           - job_name: web-api-postgres-contract-smoke
             test_name: web_api_postgres_contract_smoke
+          - job_name: archive-wal-amplification-smoke
+            test_name: archive_wal_amplification_smoke
           - job_name: web-api-boundary-smoke
             test_name: web_api_boundary_smoke
           - job_name: user-account-smoke
