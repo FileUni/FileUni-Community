@@ -159,6 +159,8 @@ jobs:
             mail_docker_smoke \
             remote_mount_timeout_smoke \
             remote_mount_rclone_smoke \
+            user_mount_rclone_smoke \
+            vfs_pool_rclone_backend_smoke \
             domain_acme_ddns_real_cloudflare_zerossl_smoke
           do
             test -x "$bundle_dir/$test_name"
@@ -485,13 +487,17 @@ jobs:
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 4
       matrix:
         include:
           - job_name: remote-mount-rclone-smoke
             test_name: remote_mount_rclone_smoke
           - job_name: remote-mount-timeout-smoke
             test_name: remote_mount_timeout_smoke
+          - job_name: user-mount-rclone-smoke
+            test_name: user_mount_rclone_smoke
+          - job_name: vfs-pool-rclone-backend-smoke
+            test_name: vfs_pool_rclone_backend_smoke
     steps:
       - name: Download smoke bundle artifact
         uses: actions/download-artifact@v4
