@@ -97,18 +97,33 @@ jobs:
       - name: Build smoke bundle
         working-directory: workspace
         shell: bash
+        env:
+          RUST_BACKTRACE: full
         run: |
           set -euo pipefail
 
           bundle_dir="$PWD/.ci/smoke-bundle"
           mkdir -p "$bundle_dir"
 
-          cargo build --locked -p fileuni --bin fileuni --message-format=json \
-            > "$bundle_dir/build.jsonl"
-          cargo build --locked -p fileuni-integration-tests --bin fileuni_e2e_server --message-format=json \
-            >> "$bundle_dir/build.jsonl"
-          cargo build --locked -p fileuni-integration-tests --tests --message-format=json \
-            >> "$bundle_dir/build.jsonl"
+          echo "=== Building fileuni ==="
+          cargo build -v --locked -p fileuni --bin fileuni --message-format=json 2>&1 \
+            | tee "$bundle_dir/build.jsonl" || {
+              echo "=== Build failed, showing full error log ==="
+              cat "$bundle_dir/build.jsonl" 2>/dev/null || true
+              exit 1
+            }
+          echo "=== Building fileuni_e2e_server ==="
+          cargo build -v --locked -p fileuni-integration-tests --bin fileuni_e2e_server --message-format=json 2>&1 \
+            | tee -a "$bundle_dir/build.jsonl" || {
+              echo "=== Build failed, showing full error log ==="
+              exit 1
+            }
+          echo "=== Building tests ==="
+          cargo build -v --locked -p fileuni-integration-tests --tests --message-format=json 2>&1 \
+            | tee -a "$bundle_dir/build.jsonl" || {
+              echo "=== Build failed, showing full error log ==="
+              exit 1
+            }
 
           install_compiler_artifact() {
             local target_name="$1"
