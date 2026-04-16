@@ -72,6 +72,15 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Show toolchain info
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Rust version: $(rustc --version)"
+          echo "Cargo version: $(cargo --version)"
+          cat rust-toolchain.toml 2>/dev/null || echo "No rust-toolchain.toml found"
+
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
@@ -702,6 +711,14 @@ jobs:
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Show toolchain info (Tauri E2E)
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Rust version: $(rustc --version)"
+          echo "Cargo version: $(cargo --version)"
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
