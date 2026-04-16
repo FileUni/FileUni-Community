@@ -343,7 +343,15 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq build-essential pkg-config clang mold
+          sudo apt-get install -y -qq build-essential pkg-config
+
+      - name: Disable workspace local linker overrides on Linux
+        if: runner.os == 'Linux'
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .cargo/config.toml .cargo/config
 
       - name: Install cargo-dist
         uses: taiki-e/install-action@v2
@@ -586,7 +594,14 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq build-essential pkg-config clang mold
+          sudo apt-get install -y -qq build-essential pkg-config
+
+      - name: Disable workspace local linker overrides
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .cargo/config.toml .cargo/config
 
       - name: Install cross
         uses: taiki-e/install-action@v2
@@ -696,7 +711,14 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq build-essential pkg-config clang mold
+          sudo apt-get install -y -qq build-essential pkg-config
+
+      - name: Disable workspace local linker overrides
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .cargo/config.toml .cargo/config
 
       - name: Setup Android SDK/NDK
         uses: android-actions/setup-android@v3
@@ -811,6 +833,14 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Disable workspace local linker overrides on Linux
+        if: startsWith(matrix.runner, 'ubuntu')
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .cargo/config.toml .cargo/config
+
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
@@ -826,9 +856,7 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev \
             xdg-utils \
-            patchelf \
-            clang \
-            mold
+            patchelf
 
       - name: Install cargo-tauri CLI
         uses: taiki-e/install-action@v2
@@ -1092,7 +1120,14 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq build-essential pkg-config clang mold
+          sudo apt-get install -y -qq build-essential pkg-config
+
+      - name: Disable workspace local linker overrides
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .cargo/config.toml .cargo/config
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -1406,10 +1441,12 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install system dependencies
+      - name: Keep workspace local linker overrides disabled for iOS build
+        working-directory: workspace
+        shell: bash
         run: |
           set -euo pipefail
-          brew install llvm mold
+          rm -f .cargo/config.toml .cargo/config
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2

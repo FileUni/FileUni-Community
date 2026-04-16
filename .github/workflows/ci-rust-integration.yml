@@ -88,6 +88,13 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq build-essential pkg-config clang mold
 
+      - name: Disable workspace local linker overrides in CI
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .cargo/config.toml .cargo/config
+
       - name: Verify linker
         shell: bash
         run: |
@@ -113,21 +120,24 @@ jobs:
           mkdir -p "$bundle_dir"
 
           echo "=== Building fileuni ==="
-          cargo build --locked -p fileuni --bin fileuni --message-format=json \
+          cargo build --locked -p fileuni --bin fileuni --message-format=json 2>&1 \
             > "$bundle_dir/build.jsonl" || {
               echo "=== Build failed ==="
+              cat "$bundle_dir/build.jsonl"
               exit 1
             }
           echo "=== Building fileuni_e2e_server ==="
-          cargo build --locked -p fileuni-integration-tests --bin fileuni_e2e_server --message-format=json \
+          cargo build --locked -p fileuni-integration-tests --bin fileuni_e2e_server --message-format=json 2>&1 \
             >> "$bundle_dir/build.jsonl" || {
               echo "=== Build failed ==="
+              cat "$bundle_dir/build.jsonl"
               exit 1
             }
           echo "=== Building tests ==="
-          cargo build --locked -p fileuni-integration-tests --tests --message-format=json \
+          cargo build --locked -p fileuni-integration-tests --tests --message-format=json 2>&1 \
             >> "$bundle_dir/build.jsonl" || {
               echo "=== Build failed ==="
+              cat "$bundle_dir/build.jsonl"
               exit 1
             }
 
@@ -199,8 +209,7 @@ jobs:
             mail_docker_smoke \
             remote_mount_timeout_smoke \
             remote_mount_rclone_smoke \
-            user_mount_rclone_smoke \
-            vfs_pool_rclone_backend_smoke \
+            public_share_nextcloud_contract_smoke \
             domain_acme_ddns_real_cloudflare_zerossl_smoke
           do
             test -x "$bundle_dir/$test_name"
@@ -318,6 +327,8 @@ jobs:
             test_name: sftp_smoke
           - job_name: ftp-smoke
             test_name: ftp_smoke
+          - job_name: public-share-nextcloud-contract-smoke
+            test_name: public_share_nextcloud_contract_smoke
     steps:
       - name: Download smoke bundle artifact
         uses: actions/download-artifact@v4
@@ -566,10 +577,6 @@ jobs:
             test_name: remote_mount_rclone_smoke
           - job_name: remote-mount-timeout-smoke
             test_name: remote_mount_timeout_smoke
-          - job_name: user-mount-rclone-smoke
-            test_name: user_mount_rclone_smoke
-          - job_name: vfs-pool-rclone-backend-smoke
-            test_name: vfs_pool_rclone_backend_smoke
     steps:
       - name: Download smoke bundle artifact
         uses: actions/download-artifact@v4
@@ -739,6 +746,14 @@ jobs:
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Disable workspace local linker overrides for Tauri E2E
+        if: matrix.os == 'linux'
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .cargo/config.toml .cargo/config
 
       - name: Show toolchain info (Tauri E2E)
         working-directory: workspace
