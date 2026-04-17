@@ -72,6 +72,12 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Set default Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup default stable
+
       - name: Show toolchain info
         working-directory: workspace
         shell: bash
@@ -934,6 +940,7 @@ jobs:
         working-directory: workspace/apps/integration-tests/tauri-e2e
         env:
           FILEUNI_TAURI_E2E_RUNTIME_ROOT: ${{ github.workspace }}/workspace/apps/integration-tests/tauri-e2e/.runtime
+          RUSTUP_TOOLCHAIN: stable
         run: xvfb-run -a bun run test
 
       - name: Run Tauri E2E on Windows
@@ -941,6 +948,7 @@ jobs:
         working-directory: workspace/apps/integration-tests/tauri-e2e
         env:
           FILEUNI_TAURI_E2E_RUNTIME_ROOT: ${{ github.workspace }}\workspace\apps\integration-tests\tauri-e2e\.runtime
+          RUSTUP_TOOLCHAIN: stable
         run: bun run test
 
   postgres-disconnect-smoke:
