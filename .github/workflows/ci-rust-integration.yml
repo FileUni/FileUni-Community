@@ -388,7 +388,7 @@ jobs:
           7z i | sed -n '1,12p'
 
       - name: Diagnose smoke binary launch
-        if: matrix.test_name == 'cli_edge_smoke' || matrix.test_name == 'runtime_context_smoke'
+        if: matrix.test_name == 'cli_edge_smoke' || matrix.test_name == 'runtime_context_smoke' || matrix.test_name == 'cli_runtime_smoke' || matrix.test_name == 'service_manager_smoke' || matrix.test_name == 'website_smoke' || matrix.test_name == 'web_api_smoke'
         shell: bash
         env:
           FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
