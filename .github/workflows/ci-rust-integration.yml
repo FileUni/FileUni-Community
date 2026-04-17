@@ -1030,7 +1030,7 @@ jobs:
           runtime_dir=""
           prev=""
           for arg in "$@"; do
-            if [ "$prev" = "--runtime-dir" ]; then
+            if [ "$prev" = "--runtime-dir" ] || [ "$prev" = "-R" ]; then
               runtime_dir="$arg"
               break
             fi
@@ -1038,7 +1038,7 @@ jobs:
           done
 
           if [ -z "$runtime_dir" ]; then
-            printf 'missing --runtime-dir argument for low-resource wrapper\n' >&2
+            printf 'missing -R/--runtime-dir argument for low-resource wrapper\n' >&2
             exit 64
           fi
 
