@@ -95,6 +95,18 @@ jobs:
           set -euo pipefail
           rm -f .cargo/config.toml .cargo/config
 
+      - name: Normalize Linux build environment for smoke bundle
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset NIX_CC NIX_CFLAGS_COMPILE NIX_LDFLAGS NIX_LD NIX_BINTOOLS_WRAPPER_TARGET_HOST_x86_64_unknown_linux_gnu || true
+          unset CC CXX CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER RUSTFLAGS || true
+          printf 'cc=' && command -v cc || true
+          printf 'clang=' && command -v clang || true
+          printf 'ldd=' && command -v ldd || true
+          ldd --version | sed -n '1,2p' || true
+
       - name: Verify linker
         shell: bash
         run: |
@@ -215,6 +227,21 @@ jobs:
             test -x "$bundle_dir/$test_name"
           done
           test -x "$bundle_dir/fileuni_e2e_server"
+
+      - name: Verify smoke bundle ELF interpreter
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          bundle_dir="$PWD/.ci/smoke-bundle"
+          for binary in "$bundle_dir/fileuni" "$bundle_dir/cli_runtime_smoke" "$bundle_dir/web_api_smoke"; do
+            file "$binary"
+            interpreter="$(readelf -l "$binary" | sed -n 's/.*Requesting program interpreter: \(.*\)]/\1/p')"
+            test -n "$interpreter"
+            printf 'interpreter=%s\n' "$interpreter"
+            test -e "$interpreter"
+          done
 
       - name: Verify embedded frontend entry
         working-directory: workspace
