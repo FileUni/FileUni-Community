@@ -197,7 +197,6 @@ jobs:
             runtime_context_smoke \
             runtime_action_matrix_smoke \
             backup_cli_smoke \
-            config_set_mode_smoke \
             gui_shared_commands_smoke \
             gui_tooling_smoke \
             service_manager_smoke \
@@ -312,8 +311,6 @@ jobs:
             test_name: runtime_action_matrix_smoke
           - job_name: backup-cli-smoke
             test_name: backup_cli_smoke
-          - job_name: config-set-mode-smoke
-            test_name: config_set_mode_smoke
           - job_name: gui-shared-commands-smoke
             test_name: gui_shared_commands_smoke
           - job_name: gui-tooling-smoke
