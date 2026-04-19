@@ -319,64 +319,94 @@ jobs:
         include:
           - job_name: web-api-smoke
             test_name: web_api_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: cli-runtime-smoke
             test_name: cli_runtime_smoke
+            fileuni_binary: fileuni
           - job_name: cli-edge-smoke
             test_name: cli_edge_smoke
+            fileuni_binary: fileuni
           - job_name: runtime-context-smoke
             test_name: runtime_context_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: runtime-action-matrix-smoke
             test_name: runtime_action_matrix_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: backup-cli-smoke
             test_name: backup_cli_smoke
+            fileuni_binary: fileuni
           - job_name: gui-shared-commands-smoke
             test_name: gui_shared_commands_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: gui-tooling-smoke
             test_name: gui_tooling_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: service-manager-smoke
             test_name: service_manager_smoke
+            fileuni_binary: fileuni
           - job_name: web-api-frontend-contract-smoke
             test_name: web_api_frontend_contract_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: web-api-postgres-contract-smoke
             test_name: web_api_postgres_contract_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: archive-wal-amplification-smoke
             test_name: archive_wal_amplification_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: web-api-boundary-smoke
             test_name: web_api_boundary_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: user-account-smoke
             test_name: user_account_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: chat-smoke
             test_name: chat_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: email-basic-smoke
             test_name: email_basic_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: website-smoke
             test_name: website_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: domain-acme-ddns-smoke
             test_name: domain_acme_ddns_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: acme-ddns-callback-smoke
             test_name: acme_ddns_callback_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: website-proxy-smoke
             test_name: website_proxy_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: extension-startup-smoke
             test_name: extension_startup_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: webdav-smoke
             test_name: webdav_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: nextcloud-smoke
             test_name: nextcloud_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: nextcloud-chunked-smoke
             test_name: nextcloud_chunked_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: s3-smoke
             test_name: s3_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: s3-multipart-smoke
             test_name: s3_multipart_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: wal-recovery-smoke
             test_name: wal_recovery_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: sftp-smoke
             test_name: sftp_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: ftp-smoke
             test_name: ftp_smoke
+            fileuni_binary: fileuni_test_server
           - job_name: public-share-nextcloud-contract-smoke
             test_name: public_share_nextcloud_contract_smoke
+            fileuni_binary: fileuni_test_server
     steps:
       - name: Checkout workspace
         uses: actions/checkout@v4
@@ -407,13 +437,16 @@ jobs:
         shell: bash
         env:
           FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
+          FILEUNI_TEST_CLI_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
         run: |
           set -euo pipefail
 
           export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni_test_server"
+          export FILEUNI_TEST_CLI_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
           printf 'pwd=%s\n' "$PWD"
           uname -a || true
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
+          printf 'FILEUNI_TEST_CLI_BINARY=%s\n' "$FILEUNI_TEST_CLI_BINARY"
           env | sort | grep -E '^(CI|GITHUB|RUNNER|RUST|FILEUNI)_' || true
 
           ls -lah smoke-bundle || true
@@ -423,7 +456,7 @@ jobs:
           ldd "smoke-bundle/${{ matrix.test_name }}" || true
           ldd "$FILEUNI_TEST_BINARY" || true
 
-          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/${{ matrix.test_name }}"
+          chmod +x "$FILEUNI_TEST_BINARY" "$FILEUNI_TEST_CLI_BINARY" "smoke-bundle/${{ matrix.test_name }}"
 
           set +e
           "$FILEUNI_TEST_BINARY" --help > /tmp/fileuni-help.log 2>&1
@@ -441,15 +474,19 @@ jobs:
         shell: bash
         env:
           FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
+          FILEUNI_TEST_CLI_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
           RUST_BACKTRACE: 1
           RUST_TEST_THREADS: 1
         run: |
           set -euo pipefail
 
           export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni_test_server"
+          export FILEUNI_TEST_CLI_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
-          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/${{ matrix.test_name }}"
+          printf 'FILEUNI_TEST_CLI_BINARY=%s\n' "$FILEUNI_TEST_CLI_BINARY"
+          chmod +x "$FILEUNI_TEST_BINARY" "$FILEUNI_TEST_CLI_BINARY" "smoke-bundle/${{ matrix.test_name }}"
           test -x "$FILEUNI_TEST_BINARY"
+          test -x "$FILEUNI_TEST_CLI_BINARY"
           "smoke-bundle/${{ matrix.test_name }}" --no-capture 2>&1 | tee "/tmp/${{ matrix.test_name }}.log"
 
   real-domain-smoke:
