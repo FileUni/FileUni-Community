@@ -227,10 +227,10 @@ jobs:
             user_account_smoke \
             chat_smoke \
             email_basic_smoke \
-            website_smoke \
-            domain_acme_ddns_smoke \
+            externalize_net_website_manager_smoke \
+            externalize_net_acme_ddns_smoke \
             acme_ddns_callback_smoke \
-            website_proxy_smoke \
+            externalize_net_website_manager_proxy_smoke \
             extension_startup_smoke \
             webdav_smoke \
             webdav_low_resource_smoke \
@@ -245,7 +245,7 @@ jobs:
             remote_mount_timeout_smoke \
             remote_mount_rclone_smoke \
             public_share_nextcloud_contract_smoke \
-            domain_acme_ddns_real_cloudflare_zerossl_smoke
+            externalize_net_acme_ddns_real_cloudflare_zerossl_smoke
           do
             test -x "$bundle_dir/$test_name"
           done
@@ -365,17 +365,17 @@ jobs:
           - job_name: email-basic-smoke
             test_name: email_basic_smoke
             fileuni_binary: fileuni_test_server
-          - job_name: website-smoke
-            test_name: website_smoke
+          - job_name: externalize-net-website-manager-smoke
+            test_name: externalize_net_website_manager_smoke
             fileuni_binary: fileuni_test_server
-          - job_name: domain-acme-ddns-smoke
-            test_name: domain_acme_ddns_smoke
+          - job_name: externalize-net-acme-ddns-smoke
+            test_name: externalize_net_acme_ddns_smoke
             fileuni_binary: fileuni_test_server
           - job_name: acme-ddns-callback-smoke
             test_name: acme_ddns_callback_smoke
             fileuni_binary: fileuni_test_server
-          - job_name: website-proxy-smoke
-            test_name: website_proxy_smoke
+          - job_name: externalize-net-website-manager-proxy-smoke
+            test_name: externalize_net_website_manager_proxy_smoke
             fileuni_binary: fileuni_test_server
           - job_name: extension-startup-smoke
             test_name: extension_startup_smoke
@@ -433,7 +433,7 @@ jobs:
           7z i | sed -n '1,12p'
 
       - name: Diagnose smoke binary launch
-        if: matrix.test_name == 'cli_edge_smoke' || matrix.test_name == 'runtime_context_smoke' || matrix.test_name == 'cli_runtime_smoke' || matrix.test_name == 'service_manager_smoke' || matrix.test_name == 'website_smoke' || matrix.test_name == 'web_api_smoke'
+        if: matrix.test_name == 'cli_edge_smoke' || matrix.test_name == 'runtime_context_smoke' || matrix.test_name == 'cli_runtime_smoke' || matrix.test_name == 'service_manager_smoke' || matrix.test_name == 'externalize_net_website_manager_smoke' || matrix.test_name == 'web_api_smoke'
         shell: bash
         env:
           FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
@@ -490,7 +490,7 @@ jobs:
           "smoke-bundle/${{ matrix.test_name }}" --no-capture 2>&1 | tee "/tmp/${{ matrix.test_name }}.log"
 
   real-domain-smoke:
-    name: real-domain-cloudflare-zerossl-smoke
+    name: real-externalize-net-acme-ddns-cloudflare-zerossl-smoke
     runs-on: ubuntu-latest
     needs: prepare-smoke-bundle
     timeout-minutes: 180
@@ -530,9 +530,9 @@ jobs:
           test -n "${TOKEN_ZEROSS_EAB_KID:-}"
           test -n "${TOKEN_ZEROSS_EAB_KEY:-}"
 
-          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke"
+          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/externalize_net_acme_ddns_real_cloudflare_zerossl_smoke"
           test -x "$FILEUNI_TEST_BINARY"
-          "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke" --ignored --no-capture 2>&1 | tee "/tmp/domain_acme_ddns_real_cloudflare_zerossl_smoke.log"
+          "smoke-bundle/externalize_net_acme_ddns_real_cloudflare_zerossl_smoke" --ignored --no-capture 2>&1 | tee "/tmp/externalize_net_acme_ddns_real_cloudflare_zerossl_smoke.log"
 
   postgres-smoke:
     name: ${{ matrix.job_name }}
