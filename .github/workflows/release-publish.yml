@@ -322,14 +322,14 @@ jobs:
           targets: wasm32-wasip1
 
       - name: Package fileuni-chat plugin
-        working-directory: workspace/examples/plugins/fileuni-chat
+        working-directory: workspace/fileuni-extensions/fileuni-chat
         run: bash scripts/extension-package.sh
 
       - name: Upload fileuni-chat plugin artifact
         uses: actions/upload-artifact@v4
         with:
           name: plugin-fileuni-chat
-          path: workspace/examples/plugins/fileuni-chat/dist/*.zip.fupkg
+          path: workspace/fileuni-extensions/fileuni-chat/dist/*.zip.fupkg
           if-no-files-found: error
 
   # ============================================================
