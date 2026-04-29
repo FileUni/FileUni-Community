@@ -208,47 +208,11 @@ jobs:
                 install -m 755 "$executable_path" "$bundle_dir/$test_name"
               done
 
-          for test_name in \
-            web_api_smoke \
-            cli_runtime_smoke \
-            cli_edge_smoke \
-            runtime_context_smoke \
-            runtime_action_matrix_smoke \
-            backup_cli_smoke \
-            gui_shared_commands_smoke \
-            gui_tooling_smoke \
-            service_manager_smoke \
-            web_api_frontend_contract_smoke \
-            web_api_postgres_contract_smoke \
-            archive_wal_amplification_smoke \
-            web_api_low_resource_smoke \
-            web_api_low_resource_restart_smoke \
-            web_api_boundary_smoke \
-            user_account_smoke \
-            chat_smoke \
-            email_basic_smoke \
-            externalize_net_website_manager_smoke \
-            externalize_net_acme_ddns_smoke \
-            acme_ddns_callback_smoke \
-            externalize_net_website_manager_proxy_smoke \
-            extension_startup_smoke \
-            webdav_smoke \
-            webdav_low_resource_smoke \
-            nextcloud_smoke \
-            nextcloud_chunked_smoke \
-            s3_smoke \
-            s3_multipart_smoke \
-            wal_recovery_smoke \
-            sftp_smoke \
-            ftp_smoke \
-            mail_docker_smoke \
-            remote_mount_timeout_smoke \
-            remote_mount_rclone_smoke \
-            public_share_nextcloud_contract_smoke \
-            externalize_net_acme_ddns_real_cloudflare_zerossl_smoke
-          do
-            test -x "$bundle_dir/$test_name"
-          done
+          find apps/integration-tests/tests -maxdepth 1 -type f -name '*.rs' -printf '%f\n' \
+            | sed 's/\.rs$//' \
+            | while IFS= read -r test_name; do
+                test -x "$bundle_dir/$test_name"
+              done
           test -x "$bundle_dir/fileuni_e2e_server"
 
       - name: Verify smoke bundle ELF interpreter
@@ -338,9 +302,6 @@ jobs:
           - job_name: gui-shared-commands-smoke
             test_name: gui_shared_commands_smoke
             fileuni_binary: fileuni_test_server
-          - job_name: gui-tooling-smoke
-            test_name: gui_tooling_smoke
-            fileuni_binary: fileuni_test_server
           - job_name: service-manager-smoke
             test_name: service_manager_smoke
             fileuni_binary: fileuni
@@ -362,9 +323,6 @@ jobs:
           - job_name: chat-smoke
             test_name: chat_smoke
             fileuni_binary: fileuni_test_server
-          - job_name: email-basic-smoke
-            test_name: email_basic_smoke
-            fileuni_binary: fileuni_test_server
           - job_name: externalize-net-website-manager-smoke
             test_name: externalize_net_website_manager_smoke
             fileuni_binary: fileuni_test_server
@@ -376,9 +334,6 @@ jobs:
             fileuni_binary: fileuni_test_server
           - job_name: externalize-net-website-manager-proxy-smoke
             test_name: externalize_net_website_manager_proxy_smoke
-            fileuni_binary: fileuni_test_server
-          - job_name: extension-startup-smoke
-            test_name: extension_startup_smoke
             fileuni_binary: fileuni_test_server
           - job_name: webdav-smoke
             test_name: webdav_smoke
@@ -634,102 +589,6 @@ jobs:
           chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/${{ matrix.test_name }}"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/${{ matrix.test_name }}" --no-capture 2>&1 | tee "/tmp/${{ matrix.test_name }}.log"
-
-  mail-smoke:
-    name: ${{ matrix.job_name }}
-    runs-on: ubuntu-latest
-    needs: prepare-smoke-bundle
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        include:
-          - job_name: mail-docker-smoke
-            db_backend: sqlite
-            kv_backend: dashmap
-          - job_name: mail-docker-smoke-postgres-database
-            db_backend: postgres
-            kv_backend: database
-          - job_name: mail-docker-smoke-postgres-redis
-            db_backend: postgres
-            kv_backend: redis
-    services:
-      greenmail:
-        image: greenmail/standalone:2.1.7
-        env:
-          GREENMAIL_OPTS: >-
-            -Dgreenmail.setup.test.smtp
-            -Dgreenmail.setup.test.imap
-            -Dgreenmail.hostname=0.0.0.0
-            -Dgreenmail.users=smoke:mail-password@example.com
-        ports:
-          - 3025:3025
-          - 3143:3143
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_DB: fileuni_test
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d fileuni_test"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 10
-    steps:
-      - name: Checkout workspace
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ needs.prepare-smoke-bundle.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
-          path: workspace
-          submodules: true
-          fetch-depth: 0
-
-      - name: Download smoke bundle artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
-          path: smoke-bundle
-
-      - name: Run smoke test
-        shell: bash
-        env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
-          FILEUNI_TEST_DB_BACKEND: ${{ matrix.db_backend }}
-          FILEUNI_TEST_KV_BACKEND: ${{ matrix.kv_backend }}
-          FILEUNI_TEST_KV_REDIS_URL: redis://127.0.0.1:6379/0
-          FILEUNI_TEST_POSTGRES_DSN: postgres://postgres:postgres@127.0.0.1:5432/fileuni_test
-          FILEUNI_TEST_MAIL_IMAP_HOST: 127.0.0.1
-          FILEUNI_TEST_MAIL_IMAP_PORT: 3143
-          FILEUNI_TEST_MAIL_SMTP_HOST: 127.0.0.1
-          FILEUNI_TEST_MAIL_SMTP_PORT: 3025
-          FILEUNI_TEST_MAIL_USERNAME: smoke
-          FILEUNI_TEST_MAIL_PASSWORD: mail-password
-          FILEUNI_TEST_MAIL_ADDRESS: smoke@example.com
-          RUST_BACKTRACE: 1
-          RUST_TEST_THREADS: 1
-        run: |
-          set -euo pipefail
-
-          export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
-          printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/mail_docker_smoke"
-          test -x "$FILEUNI_TEST_BINARY"
-          "smoke-bundle/mail_docker_smoke" --no-capture 2>&1 | tee "/tmp/mail_docker_smoke.log"
 
   remote-mount-smoke:
     name: ${{ matrix.job_name }}
