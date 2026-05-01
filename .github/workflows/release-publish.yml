@@ -171,7 +171,9 @@ jobs:
             esac
           fi
 
-          if [ -n "${release_timestamp}" ] && [[ "${release_tag}" != *"_${release_timestamp}" ]]; then
+          if [ -n "${release_timestamp}" ] \
+            && [ "${trigger_mode:-manual}" != "tag" ] \
+            && [[ "${release_tag}" != *"_${release_timestamp}" ]]; then
             release_tag="${release_tag}_${release_timestamp}"
           fi
 
