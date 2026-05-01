@@ -321,6 +321,13 @@ jobs:
         with:
           targets: wasm32-wasip1
 
+      - name: Disable workspace local linker overrides
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .cargo/config.toml .cargo/config
+
       - name: Package fileuni-chat plugin
         working-directory: workspace/fileuni-extensions/fileuni-chat
         run: bash scripts/extension-package.sh
@@ -377,8 +384,8 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq build-essential pkg-config clang cmake ninja-build
 
-      - name: Disable workspace local linker overrides on Linux
-        if: runner.os == 'Linux'
+      - name: Disable workspace local linker overrides
+        if: runner.os != 'Windows'
         working-directory: workspace
         shell: bash
         run: |
@@ -878,8 +885,8 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Disable workspace local linker overrides on Linux
-        if: startsWith(matrix.runner, 'ubuntu')
+      - name: Disable workspace local linker overrides
+        if: runner.os != 'Windows'
         working-directory: workspace
         shell: bash
         run: |
@@ -912,10 +919,16 @@ jobs:
         shell: bash
         run: bash script/prepare-libzt.sh
 
-      - name: Install cargo-tauri CLI
+      - name: Install cargo-tauri CLI (Linux/Windows)
+        if: runner.os != 'macOS'
         uses: taiki-e/install-action@v2
         with:
           tool: tauri-cli@2
+
+      - name: Install cargo-tauri CLI (macOS native)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: cargo install tauri-cli --locked --force --version '^2'
 
       - name: Build GUI bundles (unsigned)
         working-directory: workspace/apps/gui
@@ -1512,10 +1525,15 @@ jobs:
           workspaces: workspace
           key: gui-ios-${{ matrix.target }}
 
-      - name: Install cargo-tauri CLI
-        uses: taiki-e/install-action@v2
-        with:
-          tool: tauri-cli@2
+      - name: Install cargo-tauri CLI (macOS native)
+        shell: bash
+        run: cargo install tauri-cli --locked --force --version '^2'
+
+      - name: Install iOS project dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          arch -arm64 brew install xcodegen cocoapods
 
       - name: Generate GUI mobile icons
         working-directory: workspace/apps/gui
