@@ -865,14 +865,22 @@ jobs:
         if: matrix.os == 'windows'
         shell: pwsh
         run: |
-          cargo install --git https://github.com/chippers/msedgedriver-tool
-          & "$HOME/.cargo/bin/msedgedriver-tool.exe"
-          $driver = Get-ChildItem -Path $HOME -Filter msedgedriver.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $driver) {
-            throw "msedgedriver.exe not found after msedgedriver-tool run"
+          $edgeVersion = (Get-Item 'C:\Program Files (x86)\Microsoft\EdgeWebView\Application\msedgewebview2.exe').VersionInfo.ProductVersion
+          if (-not $edgeVersion) {
+            throw "failed to resolve installed WebView2 version"
           }
-          Copy-Item $driver.FullName "$HOME/.cargo/bin/msedgedriver.exe" -Force
-          & "$HOME/.cargo/bin/msedgedriver.exe" --version
+          $zipPath = Join-Path $env:RUNNER_TEMP 'edgedriver_win64.zip'
+          $extractDir = Join-Path $env:RUNNER_TEMP 'edgedriver-extract'
+          $driverTarget = Join-Path $HOME '.cargo\bin\msedgedriver.exe'
+          Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip" -OutFile $zipPath
+          Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
+          $driver = Get-ChildItem -Path $extractDir -Filter msedgedriver.exe -Recurse | Select-Object -First 1
+          if (-not $driver) {
+            throw "msedgedriver.exe not found in downloaded archive"
+          }
+          Copy-Item $driver.FullName $driverTarget -Force
+          & $driverTarget --version
           "$HOME/.cargo/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Tauri E2E dependencies
