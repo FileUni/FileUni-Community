@@ -865,22 +865,8 @@ jobs:
         if: matrix.os == 'windows'
         shell: pwsh
         run: |
-          $edgeVersion = (Get-Item 'C:\Program Files (x86)\Microsoft\EdgeWebView\Application\msedgewebview2.exe').VersionInfo.ProductVersion
-          if (-not $edgeVersion) {
-            throw "failed to resolve installed WebView2 version"
-          }
-          $zipPath = Join-Path $env:RUNNER_TEMP 'edgedriver_win64.zip'
-          $extractDir = Join-Path $env:RUNNER_TEMP 'edgedriver-extract'
-          $driverTarget = Join-Path $HOME '.cargo\bin\msedgedriver.exe'
-          Remove-Item $extractDir -Recurse -Force -ErrorAction SilentlyContinue
-          Invoke-WebRequest -Uri "https://msedgedriver.microsoft.com/$edgeVersion/edgedriver_win64.zip" -OutFile $zipPath
-          Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
-          $driver = Get-ChildItem -Path $extractDir -Filter msedgedriver.exe -Recurse | Select-Object -First 1
-          if (-not $driver) {
-            throw "msedgedriver.exe not found in downloaded archive"
-          }
-          Copy-Item $driver.FullName $driverTarget -Force
-          & $driverTarget --version
+          cargo install --git https://github.com/chippers/msedgedriver-tool
+          & "$HOME/.cargo/bin/msedgedriver-tool.exe"
           "$HOME/.cargo/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Tauri E2E dependencies
@@ -901,19 +887,7 @@ jobs:
         env:
           FILEUNI_TAURI_E2E_RUNTIME_ROOT: ${{ github.workspace }}\workspace\apps\integration-tests\tauri-e2e\.runtime
           RUSTUP_TOOLCHAIN: stable
-        shell: pwsh
-        run: |
-          $tauriDriver = Join-Path $HOME ".cargo\bin\tauri-driver.exe"
-          $edgeDriver = Join-Path $HOME ".cargo\bin\msedgedriver.exe"
-          if (-not (Test-Path $tauriDriver)) {
-            throw "tauri-driver.exe missing at $tauriDriver"
-          }
-          if (-not (Test-Path $edgeDriver)) {
-            throw "msedgedriver.exe missing at $edgeDriver"
-          }
-          & $tauriDriver --version
-          & $edgeDriver --version
-          bun run test
+        run: bun run test
 
   postgres-disconnect-smoke:
     name: postgres-disconnect-smoke
