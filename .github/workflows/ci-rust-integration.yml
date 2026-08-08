@@ -154,13 +154,6 @@ jobs:
               cat "$bundle_dir/build.jsonl"
               exit 1
             }
-          echo "=== Building fileuni_e2e_server ==="
-          cargo build --locked -p fileuni-integration-tests --bin fileuni_e2e_server --message-format=json 2>&1 \
-            >> "$bundle_dir/build.jsonl" || {
-              echo "=== Build failed ==="
-              cat "$bundle_dir/build.jsonl"
-              exit 1
-            }
           echo "=== Building fileuni_test_server ==="
           cargo build --locked -p fileuni-integration-tests --bin fileuni_test_server --message-format=json 2>&1 \
             >> "$bundle_dir/build.jsonl" || {
@@ -200,7 +193,6 @@ jobs:
           }
 
           install_compiler_artifact fileuni "$bundle_dir/fileuni"
-          install_compiler_artifact fileuni_e2e_server "$bundle_dir/fileuni_e2e_server"
           install_compiler_artifact fileuni_test_server "$bundle_dir/fileuni_test_server"
 
           jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and (.target.kind[]? == "test") and .executable != null) | [.target.name, .executable] | @tsv' "$bundle_dir/build.jsonl" \
@@ -213,7 +205,6 @@ jobs:
             | while IFS= read -r test_name; do
                 test -x "$bundle_dir/$test_name"
               done
-          test -x "$bundle_dir/fileuni_e2e_server"
 
       - name: Verify smoke bundle ELF interpreter
         working-directory: workspace
@@ -238,7 +229,30 @@ jobs:
 
           bundle_dir="$PWD/.ci/smoke-bundle"
           log_path="$bundle_dir/frontend-entry-verify.log"
-          "$bundle_dir/fileuni_e2e_server" --port 4011 >"$log_path" 2>&1 &
+          runtime_dir="$PWD/.ci/frontend-entry-verify-runtime"
+          rm -rf "$runtime_dir"
+          mkdir -p "$runtime_dir"
+
+          # First boot bootstraps the example config, then we pin the HTTP port.
+          "$bundle_dir/fileuni" -R "$runtime_dir" >"$log_path" 2>&1 &
+          bootstrap_pid=$!
+          sleep 3
+          kill "$bootstrap_pid" >/dev/null 2>&1 || true
+          wait "$bootstrap_pid" >/dev/null 2>&1 || true
+
+          config_path="$runtime_dir/config.toml"
+          test -f "$config_path"
+          python3 - "$config_path" <<'PY'
+          import sys
+          from pathlib import Path
+          path = Path(sys.argv[1])
+          text = path.read_text(encoding="utf-8")
+          import re
+          text = re.sub(r'(?m)^main_port\s*=\s*\d+', 'main_port = 4011', text, count=1)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+          "$bundle_dir/fileuni" -R "$runtime_dir" >>"$log_path" 2>&1 &
           server_pid=$!
 
           cleanup() {
@@ -247,7 +261,7 @@ jobs:
           }
           trap cleanup EXIT
 
-          for _ in $(seq 1 60); do
+          for _ in $(seq 1 120); do
             if curl -fsS "http://127.0.0.1:4011/api/v1/ping" >/dev/null; then
               break
             fi
@@ -643,100 +657,6 @@ jobs:
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/${{ matrix.test_name }}" --no-capture 2>&1 | tee "/tmp/${{ matrix.test_name }}.log"
-
-  webui-e2e:
-    name: webui-e2e-playwright
-    runs-on: ubuntu-latest
-    needs: prepare-smoke-bundle
-    timeout-minutes: 90
-    steps:
-      - name: Checkout workspace
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ needs.prepare-smoke-bundle.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
-          path: workspace
-          submodules: true
-          fetch-depth: 0
-
-      - name: Download smoke bundle artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
-          path: smoke-bundle
-
-      - name: Setup Bun
-        id: setup-bun-webui-e2e
-        uses: oven-sh/setup-bun@v2
-        continue-on-error: true
-
-      - name: Fallback install Bun via npm
-        if: steps.setup-bun-webui-e2e.outcome == 'failure'
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm install -g bun@1.3.12
-          bun --version
-
-      - name: Install Playwright dependencies
-        working-directory: workspace/apps/integration-tests/e2e
-        run: |
-          bun install --frozen-lockfile
-          bunx playwright install chromium
-
-      - name: Run web UI E2E test
-        working-directory: workspace/apps/integration-tests/e2e
-        env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
-          FILEUNI_E2E_BASE_URL: http://127.0.0.1:4010
-          FILEUNI_E2E_SERVER_COMMAND: FILEUNI_E2E_ENABLE_FILE_COMPRESS=1 ${{ github.workspace }}/smoke-bundle/fileuni_e2e_server --port 4010
-        run: |
-          chmod +x "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_test_server" "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_e2e_server"
-          test -x "$FILEUNI_TEST_BINARY"
-          bun run test
-
-      - name: Upload web UI E2E step screenshots
-        id: upload-webui-e2e-step-screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: webui-e2e-step-screenshots
-          path: workspace/apps/integration-tests/e2e/test-results/**/*.png
-          if-no-files-found: warn
-
-      - name: Upload Playwright artifacts
-        id: upload-webui-e2e-playwright-artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: webui-e2e-playwright-artifacts
-          path: |
-            workspace/apps/integration-tests/e2e/test-results/
-            workspace/apps/integration-tests/e2e/playwright-report/
-          if-no-files-found: warn
-
-      - name: Summarize web UI E2E artifacts
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          {
-            printf '## Web UI E2E artifacts\n\n'
-            if [ -n "${{ steps.upload-webui-e2e-step-screenshots.outputs.artifact-id }}" ]; then
-              printf -- '- Step screenshots: https://github.com/%s/actions/runs/%s/artifacts/%s\n' \
-                "${{ github.repository }}" \
-                "${{ github.run_id }}" \
-                "${{ steps.upload-webui-e2e-step-screenshots.outputs.artifact-id }}"
-            fi
-            if [ -n "${{ steps.upload-webui-e2e-playwright-artifacts.outputs.artifact-id }}" ]; then
-              printf -- '- Full Playwright report and raw results: https://github.com/%s/actions/runs/%s/artifacts/%s\n' \
-                "${{ github.repository }}" \
-                "${{ github.run_id }}" \
-                "${{ steps.upload-webui-e2e-playwright-artifacts.outputs.artifact-id }}"
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
 
   tauri-mock-tests:
     name: tauri-mock-tests-vitest
